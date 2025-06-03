@@ -120,7 +120,7 @@ class _BaseShapes(ParentedElementProxy):
         """Return the base name for a placeholder of `ph_type` in this shape collection.
 
         There is some variance between slide types, for example a notes slide uses a different
-        name for the body placeholder, so this method can be overriden by subclasses.
+        name for the body placeholder, so this method can be overridden by subclasses.
         """
         return {
             PP_PLACEHOLDER.BITMAP: "ClipArt Placeholder",

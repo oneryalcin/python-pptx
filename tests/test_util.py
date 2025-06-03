@@ -45,6 +45,7 @@ class DescribeLength(object):
             (914400, "emu", 914400),
             (914400, "mm", 25.4),
             (914400, "pt", 72.0),
+            (91440, "pt", 7.2),
         ]
     )
     def units_fixture(self, request):

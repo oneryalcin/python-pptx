@@ -10,7 +10,7 @@ application to be installed or licensed.
 It can also be used to analyze PowerPoint files from a corpus, perhaps to extract search
 indexing text and images.
 
-In can also be used to simply automate the production of a slide or two that would be
+It can also be used to simply automate the production of a slide or two that would be
 tedious to get right by hand, which is how this all got started.
 
 More information is available in the `python-pptx documentation`_.
