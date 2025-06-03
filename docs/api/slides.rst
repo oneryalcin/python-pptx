@@ -53,6 +53,9 @@ This class is not intended to be constructed directly.
    :inherited-members:
    :undoc-members:
 
+   .. automethod:: add_layout
+      :noindex:
+
 
 |SlideLayout| objects
 ---------------------
@@ -60,6 +63,9 @@ This class is not intended to be constructed directly.
 .. autoclass:: pptx.slide.SlideLayout
    :members:
    :exclude-members: iter_cloneable_placeholders
+
+   .. autoattribute:: layout_type
+      :noindex:
 
 
 |SlideMasters| objects
@@ -99,6 +105,21 @@ This class is not intended to be constructed directly.
 
 .. autoclass:: pptx.shapes.shapetree.SlidePlaceholders
    :members:
+
+
+|LayoutPlaceholders| objects
+---------------------------
+
+The |LayoutPlaceholders| object is accessed via the
+:attr:`~pptx.slide.SlideLayout.placeholders` property of a |SlideLayout|
+object.
+
+.. autoclass:: pptx.shapes.shapetree.LayoutPlaceholders
+   :members:
+   :undoc-members:
+
+   .. automethod:: add
+      :noindex:
 
 
 |NotesSlide| objects

@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Callable, cast
 from pptx.oxml import parse_from_template, parse_xml
 from pptx.oxml.dml.fill import CT_GradientFillProperties
 from pptx.oxml.ns import nsdecls
-from pptx.oxml.simpletypes import XsdString
+from pptx.oxml.simpletypes import XsdString, XsdUnsignedInt, XsdToken
 from pptx.oxml.xmlchemy import (
     BaseOxmlElement,
     Choice,
@@ -256,7 +256,32 @@ class CT_SlideLayout(_BaseSlideElement):
 
     _tag_seq = ("p:cSld", "p:clrMapOvr", "p:transition", "p:timing", "p:hf", "p:extLst")
     cSld: CT_CommonSlideData = OneAndOnlyOne("p:cSld")  # pyright: ignore[reportAssignmentType]
+    # --- type is ST_SlideLayoutType in schema, a token like "title", "blank" ---
+    type: str = RequiredAttribute("type", XsdToken)  # pyright: ignore[reportAssignmentType]
     del _tag_seq
+
+    @classmethod
+    def new(cls, name: str, sl_type: str) -> CT_SlideLayout:
+        """Return a new `p:sldLayout` element configured with basic skeleton."""
+        xml_str = f'''
+            <p:sldLayout {nsdecls('p', 'a')} type="{sl_type}" preserve="1">
+              <p:cSld name="{name}">
+                <p:spTree>
+                  <p:nvGrpSpPr>
+                    <p:cNvPr id="1" name=""/>
+                    <p:cNvGrpSpPr/>
+                    <p:nvPr/>
+                  </p:nvGrpSpPr>
+                  <p:grpSpPr/>
+                </p:spTree>
+              </p:cSld>
+              <p:clrMapOvr>
+                <a:masterClrMapping/>
+              </p:clrMapOvr>
+            </p:sldLayout>
+        '''
+        sldLayout = cast(CT_SlideLayout, parse_xml(xml_str))
+        return sldLayout
 
 
 class CT_SlideLayoutIdList(BaseOxmlElement):
@@ -276,6 +301,7 @@ class CT_SlideLayoutIdListEntry(BaseOxmlElement):
     Contains a reference to a slide layout.
     """
 
+    id: int | None = OptionalAttribute("id", XsdUnsignedInt)  # pyright: ignore[reportAssignmentType]
     rId: str = RequiredAttribute("r:id", XsdString)  # pyright: ignore[reportAssignmentType]
 
 
@@ -295,10 +321,37 @@ class CT_SlideMaster(_BaseSlideElement):
         "p:extLst",
     )
     cSld: CT_CommonSlideData = OneAndOnlyOne("p:cSld")  # pyright: ignore[reportAssignmentType]
-    sldLayoutIdLst: CT_SlideLayoutIdList = ZeroOrOne(  # pyright: ignore[reportAssignmentType]
+    sldLayoutIdLst: CT_SlideLayoutIdList | None = ZeroOrOne(  # pyright: ignore[reportAssignmentType]
         "p:sldLayoutIdLst", successors=_tag_seq[3:]
     )
     del _tag_seq
+
+    @property
+    def next_sldLayoutId_id(self) -> int:
+        """Return the next available unique ID for a `p:sldLayoutId` child.
+
+        The values are typically high integers like 2147483648, 2147483649, etc.
+        This method finds the maximum existing ID and returns one greater. If no
+        `p:sldLayoutId` elements are present or none have an `id` attribute,
+        it returns 2147483648 as the starting ID.
+        """
+        sldLayoutIdLst = self.sldLayoutIdLst
+        if sldLayoutIdLst is None or not sldLayoutIdLst.sldLayoutId_lst:
+            return 2147483648  # Starting ID if none exist
+
+        max_id = 0
+        found_any_id = False
+        for sldLayoutId in sldLayoutIdLst.sldLayoutId_lst:
+            if sldLayoutId.id is not None:
+                found_any_id = True
+                if sldLayoutId.id > max_id:
+                    max_id = sldLayoutId.id
+
+        if not found_any_id: # No existing elements have an id
+            return 2147483648
+
+        # Ensure the next ID is at least the base starting ID, but also greater than any existing.
+        return max(max_id, 2147483648 - 1) + 1
 
 
 class CT_SlideTiming(BaseOxmlElement):

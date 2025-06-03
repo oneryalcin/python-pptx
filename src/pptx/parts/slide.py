@@ -7,9 +7,10 @@ from typing import IO, TYPE_CHECKING, cast
 from pptx.enum.shapes import PROG_ID
 from pptx.opc.constants import CONTENT_TYPE as CT
 from pptx.opc.constants import RELATIONSHIP_TYPE as RT
-from pptx.opc.package import XmlPart
+from pptx.opc.package import OpcPackage, XmlPart
 from pptx.opc.packuri import PackURI
-from pptx.oxml.slide import CT_NotesMaster, CT_NotesSlide, CT_Slide
+from pptx.oxml.xmlchemy import BaseOxmlElement
+from pptx.oxml.slide import CT_NotesMaster, CT_NotesSlide, CT_Slide, CT_SlideLayout
 from pptx.oxml.theme import CT_OfficeStyleSheet
 from pptx.parts.chart import ChartPart
 from pptx.parts.embeddedpackage import EmbeddedPackagePart
@@ -30,7 +31,11 @@ class BaseSlidePart(XmlPart):
     notes-master, and handout-master parts.
     """
 
-    _element: CT_Slide
+    _element: CT_Slide  # Specific part types will override this type hint
+
+    def __init__(self, partname: PackURI, content_type: str, package: OpcPackage, element: BaseOxmlElement):
+        super().__init__(partname, content_type, package, element)
+        self._cached_max_shape_id: int | None = None
 
     def get_image(self, rId: str) -> Image:
         """Return an |Image| object containing the image related to this slide by *rId*.
@@ -55,6 +60,44 @@ class BaseSlidePart(XmlPart):
     def name(self) -> str:
         """Internal name of this slide."""
         return self._element.cSld.name
+
+    @property
+    def _next_shape_id(self) -> int:
+        """Return a unique shape id suitable for use with a new shape.
+
+        The returned id is 1 greater than the maximum shape id used so far in this
+        part. If turbo mode is enabled for this part, it uses a cached maximum.
+        Shape IDs are unique within a part, usually starting from 1 or 2.
+        The spTree element itself often has id="1", so shapes start at 2.
+        """
+        spTree = self._element.cSld.spTree
+
+        if self._cached_max_shape_id is not None:
+            self._cached_max_shape_id += 1
+            return self._cached_max_shape_id
+
+        # CT_GroupShape (spTree) already has a robust max_shape_id property
+        # that correctly finds the maximum ID among all descendant shapes.
+        current_max_id = spTree.max_shape_id
+        return current_max_id + 1
+
+    @property
+    def turbo_add_enabled(self) -> bool:
+        """True if "turbo-add" mode is enabled for this part. Read/Write.
+
+        Enabling this mode caches the current maximum shape ID for the part,
+        which can significantly speed up adding many shapes. However, it should
+        only be used when a single Part instance is being used to add shapes;
+        using multiple Part instances for the same underlying part with turbo
+        mode on can lead to shape ID collisions.
+        """
+        return self._cached_max_shape_id is not None
+
+    @turbo_add_enabled.setter
+    def turbo_add_enabled(self, value: bool):
+        enable = bool(value)
+        spTree = self._element.cSld.spTree
+        self._cached_max_shape_id = spTree.max_shape_id if enable else None
 
 
 class NotesMasterPart(BaseSlidePart):
@@ -265,6 +308,39 @@ class SlideLayoutPart(BaseSlidePart):
 
     Corresponds to package files ``ppt/slideLayouts/slideLayout[1-9][0-9]*.xml``.
     """
+
+    @classmethod
+    def new(cls, name: str, slide_layout_type: str, slide_master_part):
+        """Return newly-created slide layout part.
+
+        The new slide-layout part is named *name*, has *slide_layout_type* and
+        is related to *slide_master_part*.
+        """
+        package = slide_master_part.package
+        partname = package.next_partname("/ppt/slideLayouts/slideLayout%d.xml")
+
+        # ---Call CT_SlideLayout.new() to generate the element---
+        sldLayout_elm = CT_SlideLayout.new(name, slide_layout_type)
+
+        slide_layout_part = cls(partname, CT.PML_SLIDE_LAYOUT, package, sldLayout_elm)
+
+        # ---relate to slide master---
+        rId = slide_master_part.relate_to(slide_layout_part, RT.SLIDE_LAYOUT)
+
+        # ---update slide master's sldLayoutIdLst---
+        sldMaster = slide_master_part._element
+        sldLayoutIdLst = sldMaster.get_or_add_sldLayoutIdLst()
+        # ---Assuming sldMaster.next_sldLayoutId() provides the unique ID---
+        # This might need refinement if next_sldLayoutId is not directly available
+        # or if it needs a different invocation.
+        # Using a placeholder ID as per subtask instructions, as CT_SlideMaster.next_sldLayoutId()
+        # was not found. This will be refined in a later step.
+        # The typical range starts from 2147483648.
+        new_sldLayoutId = sldLayoutIdLst._add_sldLayoutId(rId=rId)
+        # ---Set the unique ID for the sldLayoutId entry---
+        new_sldLayoutId.id = slide_master_part._element.next_sldLayoutId_id
+
+        return slide_layout_part
 
     @lazyproperty
     def slide_layout(self):
