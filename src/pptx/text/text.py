@@ -3,20 +3,20 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Iterator, cast
+
 from lxml import etree
+
 from pptx.dml.fill import FillFormat
-from pptx.enum.dml import MSO_FILL
 from pptx.enum.lang import MSO_LANGUAGE_ID
 from pptx.enum.text import MSO_AUTO_SIZE, MSO_UNDERLINE, MSO_VERTICAL_ANCHOR
 from pptx.opc.constants import RELATIONSHIP_TYPE as RT
-from pptx.oxml.simpletypes import ST_TextWrappingType, ST_TextFontStrike
+from pptx.oxml.simpletypes import ST_TextFontStrike, ST_TextWrappingType
 from pptx.shapes import Subshape
 from pptx.text.fonts import FontFiles
 from pptx.text.layout import TextFitter
 from pptx.util import Centipoints, Emu, Length, Pt, lazyproperty
 
 if TYPE_CHECKING:
-    from pptx.dml.color import ColorFormat
     from pptx.enum.text import (
         MSO_TEXT_UNDERLINE_TYPE,
         MSO_VERTICAL_ANCHOR,
@@ -490,18 +490,19 @@ class Font(object):
 
     def get_attrs(self) -> dict:
         """Return a dictionary of font attributes.
-        
+
         Returns:
-            dict: Font attributes including bold, color, italic, name, size (in points), and underline.
+            dict: Font attributes including bold, color, italic, name, size (in points),
+                  and underline.
         """
         return {
-            'bold': self.bold,
-            'strikethrough': self.strikethrough,
-            'color': self.color,
-            'italic': self.italic,
-            'name': self.name,
-            'size': self.size.pt if self.size is not None else None,
-            'underline': self.underline,
+            "bold": self.bold,
+            "strikethrough": self.strikethrough,
+            "color": self.color,
+            "italic": self.italic,
+            "name": self.name,
+            "size": self.size.pt if self.size is not None else None,
+            "underline": self.underline,
         }
 
     def __hash__(self):
