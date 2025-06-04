@@ -232,13 +232,14 @@ class IntrospectionMixin:
             
         Future FEP Integration Points:
             - Type handler registry for extensible type support (planned for later FEPs)
-            - Enum introspection will be added here (FEP-002)
+            - Enum introspection implemented in FEP-002
             - Custom serialization protocols for complex objects
         """
         # PERFORMANCE: Local imports prevent circular dependencies but are repeated per call.
         # For high-frequency usage, consider module-level imports with lazy loading pattern.
         from pptx.dml.color import RGBColor # type: ignore
         from pptx.util import Length # type: ignore
+        from pptx.enum.base import BaseEnum, BaseXmlEnum # type: ignore
 
         try:
             if isinstance(value, RGBColor):
@@ -263,6 +264,24 @@ class IntrospectionMixin:
                     }
                 except Exception as e:
                     return self._create_error_context("Length", e, value)
+                    
+            elif isinstance(value, (BaseEnum, BaseXmlEnum)):
+                # FEP-002: Enum member introspection
+                try:
+                    enum_dict = {
+                        "_object_type": type(value).__name__,
+                        "name": value.name,
+                        "value": int(value),
+                        "description": getattr(value, '__doc__', None) or ""
+                    }
+                    
+                    # Add xml_value for BaseXmlEnum instances
+                    if isinstance(value, BaseXmlEnum):
+                        enum_dict["xml_value"] = getattr(value, 'xml_value', None)
+                    
+                    return enum_dict
+                except Exception as e:
+                    return self._create_error_context("enum", e, value)
                     
             elif hasattr(value, 'to_dict') and callable(value.to_dict) and not inspect.isclass(value):
                  # Ensure it's not the class method itself, but an instance method

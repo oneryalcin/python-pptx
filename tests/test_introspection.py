@@ -4,6 +4,8 @@ import unittest
 from pptx.introspection import IntrospectionMixin
 from pptx.dml.color import RGBColor
 from pptx.util import Emu, Inches # For testing Length formatting
+from pptx.enum.shapes import MSO_SHAPE_TYPE, MSO_AUTO_SHAPE_TYPE, PROG_ID  # For testing enum formatting
+from pptx.enum.dml import MSO_COLOR_TYPE, MSO_LINE_DASH_STYLE  # For testing enum formatting
 
 class MyObjectWithRGB(IntrospectionMixin):
     def __init__(self, rgb_color_val, length_val=None):
@@ -381,6 +383,164 @@ class TestIntrospectionMixin(unittest.TestCase):
 
         # Clean up the attribute we added to the instance for this test
         delattr(dummy, "my_list_complex")
+
+    def test_base_enum_formatting(self):
+        """Test that BaseEnum members are properly serialized to dictionaries."""
+        # Create a test object with BaseEnum property
+        class EnumTestObj(IntrospectionMixin):
+            def __init__(self, enum_val):
+                self.shape_type = enum_val
+
+            def _to_dict_properties(self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm):
+                return {
+                    "shape_type": self._format_property_value_for_to_dict(
+                        self.shape_type, include_private, _visited_ids, max_depth - 1, expand_collections, format_for_llm
+                    )
+                }
+
+        # Test MSO_SHAPE_TYPE (BaseEnum)
+        obj = EnumTestObj(MSO_SHAPE_TYPE.PICTURE)
+        result = obj.to_dict()
+        
+        expected_shape_type_dict = {
+            "_object_type": "MSO_SHAPE_TYPE",
+            "name": "PICTURE",
+            "value": 13,
+            "description": "Picture"
+        }
+        
+        self.assertEqual(result['properties']['shape_type'], expected_shape_type_dict)
+        # Verify it doesn't have xml_value since it's BaseEnum, not BaseXmlEnum
+        self.assertNotIn("xml_value", result['properties']['shape_type'])
+
+    def test_base_xml_enum_formatting(self):
+        """Test that BaseXmlEnum members are properly serialized to dictionaries."""
+        # Create a test object with BaseXmlEnum property
+        class XmlEnumTestObj(IntrospectionMixin):
+            def __init__(self, enum_val):
+                self.auto_shape_type = enum_val
+
+            def _to_dict_properties(self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm):
+                return {
+                    "auto_shape_type": self._format_property_value_for_to_dict(
+                        self.auto_shape_type, include_private, _visited_ids, max_depth - 1, expand_collections, format_for_llm
+                    )
+                }
+
+        # Test MSO_AUTO_SHAPE_TYPE (BaseXmlEnum)
+        obj = XmlEnumTestObj(MSO_AUTO_SHAPE_TYPE.RECTANGLE)
+        result = obj.to_dict()
+        
+        expected_auto_shape_dict = {
+            "_object_type": "MSO_AUTO_SHAPE_TYPE",
+            "name": "RECTANGLE",
+            "value": 1,
+            "description": "Rectangle",
+            "xml_value": "rect"
+        }
+        
+        self.assertEqual(result['properties']['auto_shape_type'], expected_auto_shape_dict)
+        # Verify it has xml_value since it's BaseXmlEnum
+        self.assertIn("xml_value", result['properties']['auto_shape_type'])
+
+    def test_enum_with_none_xml_value(self):
+        """Test enum members that have None as xml_value."""
+        # Create a test object with enum that has None xml_value
+        class NoneXmlEnumTestObj(IntrospectionMixin):
+            def __init__(self, enum_val):
+                self.line_style = enum_val
+
+            def _to_dict_properties(self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm):
+                return {
+                    "line_style": self._format_property_value_for_to_dict(
+                        self.line_style, include_private, _visited_ids, max_depth - 1, expand_collections, format_for_llm
+                    )
+                }
+
+        # Test enum member with None xml_value (DASH_STYLE_MIXED has empty xml_value "")
+        obj = NoneXmlEnumTestObj(MSO_LINE_DASH_STYLE.DASH_STYLE_MIXED)
+        result = obj.to_dict()
+        
+        expected_dict = {
+            "_object_type": "MSO_LINE_DASH_STYLE",
+            "name": "DASH_STYLE_MIXED",
+            "value": -2,
+            "description": "Not supported.",
+            "xml_value": ""  # This enum has empty string, not None
+        }
+        
+        self.assertEqual(result['properties']['line_style'], expected_dict)
+
+    def test_enum_collections(self):
+        """Test that collections containing enum members are properly handled."""
+        class EnumCollectionTestObj(IntrospectionMixin):
+            def __init__(self):
+                self.shape_types = [MSO_SHAPE_TYPE.PICTURE, MSO_SHAPE_TYPE.TABLE]
+                self.mixed_collection = [MSO_COLOR_TYPE.RGB, "string", 42]
+
+            def _to_dict_properties(self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm):
+                return {
+                    "shape_types": self._format_property_value_for_to_dict(
+                        self.shape_types, include_private, _visited_ids, max_depth - 1, expand_collections, format_for_llm
+                    ),
+                    "mixed_collection": self._format_property_value_for_to_dict(
+                        self.mixed_collection, include_private, _visited_ids, max_depth - 1, expand_collections, format_for_llm
+                    )
+                }
+
+        obj = EnumCollectionTestObj()
+        result = obj.to_dict(max_depth=3)  # Ensure we have enough depth for collection expansion
+        
+        # Check that enum members in collections are properly serialized
+        shape_types = result['properties']['shape_types']
+        self.assertIsInstance(shape_types, list)
+        self.assertEqual(len(shape_types), 2)
+        
+        # First enum in collection
+        self.assertEqual(shape_types[0]['_object_type'], "MSO_SHAPE_TYPE")
+        self.assertEqual(shape_types[0]['name'], "PICTURE")
+        self.assertEqual(shape_types[0]['value'], 13)
+        
+        # Second enum in collection
+        self.assertEqual(shape_types[1]['_object_type'], "MSO_SHAPE_TYPE")
+        self.assertEqual(shape_types[1]['name'], "TABLE")
+        self.assertEqual(shape_types[1]['value'], 19)
+        
+        # Mixed collection should handle enum, string, and int properly
+        mixed = result['properties']['mixed_collection']
+        self.assertIsInstance(mixed, list)
+        self.assertEqual(len(mixed), 3)
+        
+        # First item is enum
+        self.assertEqual(mixed[0]['_object_type'], "MSO_COLOR_TYPE")
+        self.assertEqual(mixed[0]['name'], "RGB")
+        # Second item is string
+        self.assertEqual(mixed[1], "string")
+        # Third item is int
+        self.assertEqual(mixed[2], 42)
+
+    def test_prog_id_enum_handling(self):
+        """Test that PROG_ID enum (which doesn't inherit from BaseEnum/BaseXmlEnum) falls back to repr."""
+        class ProgIdTestObj(IntrospectionMixin):
+            def __init__(self, prog_id):
+                self.prog_id = prog_id
+
+            def _to_dict_properties(self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm):
+                return {
+                    "prog_id": self._format_property_value_for_to_dict(
+                        self.prog_id, include_private, _visited_ids, max_depth - 1, expand_collections, format_for_llm
+                    )
+                }
+
+        # PROG_ID doesn't inherit from BaseEnum or BaseXmlEnum, so it should fall back to repr
+        obj = ProgIdTestObj(PROG_ID.XLSX)
+        result = obj.to_dict()
+        
+        # Should fall back to repr() since PROG_ID is not BaseEnum/BaseXmlEnum
+        self.assertIsInstance(result['properties']['prog_id'], str)
+        self.assertIn('PROG_ID.XLSX', result['properties']['prog_id'])
+        # Should NOT be a dict with _object_type
+        self.assertNotIsInstance(result['properties']['prog_id'], dict)
 
 
 if __name__ == '__main__':
