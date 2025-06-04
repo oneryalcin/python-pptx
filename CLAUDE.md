@@ -781,6 +781,7 @@ def test_target_class_formatting(self):
 - `src/pptx/shapes/base.py` - Shape object hierarchy and safe property access
 - `src/pptx/dml/color.py` - Color formatting implementations
 - `src/pptx/dml/fill.py` - Fill formatting and GradientStop implementations
+- `src/pptx/dml/line.py` - Line formatting and styling implementations
 
 ### **Office Open XML References:**
 - `spec/` directory - Complete OOXML specifications
@@ -803,7 +804,146 @@ grep -r "class.*IntrospectionMixin" src/pptx/
 python -m pytest tests/test_introspection.py -k "enum" -v
 python -m pytest tests/test_introspection.py -k "base_shape" -v
 python -m pytest tests/test_introspection.py -k "fillformat" -v
+python -m pytest tests/test_introspection.py -k "lineformat" -v
 ```
+
+## 🧪 Testing Strategy & Best Practices
+
+### **Three-Tier Testing Approach**
+
+#### **1. Unit Tests (Mock-Based)**
+- **Purpose:** Isolated testing of introspection methods
+- **Location:** `tests/test_introspection.py`
+- **Pattern:** Custom mock classes with controlled property behavior
+- **Benefits:** Fast, predictable, covers edge cases and error scenarios
+
+```python
+class MockLineFormat(LineFormat):
+    def __init__(self):
+        self._width = Pt(2.5)
+        self._dash_style = MSO_LINE_DASH_STYLE.DASH
+        self._fill = MockFillFormat("SOLID")
+```
+
+#### **2. Live/Integration Tests**
+- **Purpose:** Validate with real python-pptx objects
+- **Pattern:** Create actual presentations with various styling scenarios
+- **Benefits:** Catches real-world issues, validates data accuracy
+- **Recommendation:** Create live test scripts for each FEP
+
+```python
+def create_test_presentation():
+    prs = Presentation()
+    slide = prs.slides.add_slide(prs.slide_layouts[5])
+    
+    # Test various real styling scenarios
+    rect = slide.shapes.add_shape(1, Inches(1), Inches(1), Inches(2), Inches(1))
+    rect.line.color.rgb = RGBColor(0, 0, 255)
+    rect.line.width = Pt(2)
+    rect.line.dash_style = MSO_LINE_DASH_STYLE.DASH
+    
+    # Validate introspection with real objects
+    result = rect.line.to_dict()
+    assert result['properties']['width']['pt'] == 2.0
+```
+
+#### **3. Regression Tests**
+- **Purpose:** Ensure no existing functionality breaks
+- **Pattern:** Run full test suite after each FEP implementation
+- **Critical:** Always verify 0 test failures before committing
+
+### **Key Testing Learnings from FEP-006**
+
+#### **Live Testing Discoveries:**
+1. **Data Precision:** Real objects showed exact EMU-to-point conversions (25400 EMU = 2.0pt)
+2. **Property Dependencies:** `LineFormat.color` has side effects, better to use `fill.to_dict()`
+3. **Edge Case Reality:** Zero-width lines and background fills behave exactly as designed
+4. **LLM Context Quality:** Real-world summaries are more informative than mock expectations
+
+#### **Critical Validation Points:**
+```bash
+# Validate RGB color precision
+Expected: 7B2D43, Got: 7B2D43 ✓
+
+# Validate width conversion accuracy  
+Expected: 2.75pt, Got: 2.75pt ✓
+
+# Validate enum mapping consistency
+Expected: DASH_DOT_DOT, Got: DASH_DOT_DOT ✓
+```
+
+### **FEP Development Best Practices (Updated)**
+
+#### **Enhanced Workflow:**
+1. **Research & Design:** Study target classes and dependencies
+2. **Unit Test Development:** Create comprehensive mock-based tests
+3. **Implementation:** Add IntrospectionMixin inheritance and methods
+4. **Unit Test Validation:** Ensure all mocked scenarios pass
+5. **🆕 Live Testing:** Create and run real-object validation script
+6. **🆕 Data Accuracy Validation:** Verify precision of captured data
+7. **Regression Testing:** Run full test suite
+8. **Linting & Formatting:** Clean code quality
+9. **🆕 PR Documentation:** Include live test results in PR description
+10. **Commit & PR Creation:** With comprehensive documentation
+
+#### **Live Testing Template:**
+```python
+#!/usr/bin/env python3
+"""
+Live Test Script for FEP-XXX: ClassName.to_dict() - Feature Description
+Usage: python test_fepXXX_live.py
+"""
+
+def create_test_objects():
+    """Create real python-pptx objects with various configurations."""
+    # Implementation-specific object creation
+    pass
+
+def test_introspection():
+    """Test to_dict() with real objects."""
+    for description, obj in create_test_objects():
+        result = obj.to_dict()
+        # Validate structure, properties, and LLM context
+        print(f"✅ {description}: {result['_llm_context']['summary']}")
+
+def validate_data_accuracy():
+    """Validate precision and consistency of captured data."""
+    # Test specific property values for accuracy
+    pass
+
+if __name__ == "__main__":
+    test_introspection()
+    validate_data_accuracy()
+```
+
+#### **Error Handling Patterns (Refined):**
+```python
+def _to_dict_properties(self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm):
+    props = {}
+    
+    # Pattern: Individual property error handling
+    try:
+        props["complex_property"] = self._format_property_value_for_to_dict(
+            self.complex_property, include_private, _visited_ids, max_depth, expand_collections, format_for_llm
+        )
+    except Exception as e:
+        props["complex_property"] = self._create_error_context("complex_property", e, "access failed")
+    
+    return props
+```
+
+### **Integration Testing Insights**
+
+#### **FEP Integration Validation:**
+- **FEP-005 + FEP-006:** LineFormat successfully leverages FillFormat.to_dict()
+- **Cross-FEP Dependencies:** Ensure upstream FEP functionality remains stable
+- **Performance Impact:** Live testing shows no measurable performance degradation
+
+#### **Real-World Data Patterns:**
+- **EMU Precision:** 1 point = 12,700 EMU (exact conversion maintained)
+- **RGB Accuracy:** Hex values precisely match input RGB values
+- **Enum Consistency:** All enumeration mappings maintain value/name consistency
+- **LLM Context Quality:** Real objects produce more nuanced summaries than mocks
 
 ## 📈 Progress Tracking
 
@@ -813,19 +953,27 @@ python -m pytest tests/test_introspection.py -k "fillformat" -v
 - **FEP-003** ✅ BaseShape Identity & Geometry (PR #10)
 - **FEP-004** ✅ ColorFormat Color & Theme Introspection (PR #12)
 - **FEP-005** ✅ FillFormat Fill Type & Properties Introspection (PR #14)
+- **FEP-006** ✅ LineFormat Line Styling Introspection (PR #16)
 
 ### **Current Status**
-- **Total Progress:** 5/18 FEPs completed (27.8%)
+- **Total Progress:** 6/18 FEPs completed (33.3%)
 - **Foundation Phase:** ✅ COMPLETE - All foundational patterns established
-- **Core Object Phase:** 🔄 IN PROGRESS - Next priority FEPs 006-007
-- **Test Coverage:** 32/32 introspection tests passing (7 new FillFormat/GradientStop tests)
+- **Core Object Phase:** 🔄 IN PROGRESS - DML formatting trilogy complete
+- **Test Coverage:** 38/38 introspection tests passing (6 new LineFormat tests)
 - **Zero Regressions:** All existing functionality preserved
 
+### **DML Formatting Trilogy Completed** 🎉
+- ✅ **ColorFormat** (FEP-004): Color and theme introspection
+- ✅ **FillFormat** (FEP-005): Fill type and properties introspection  
+- ✅ **LineFormat** (FEP-006): Line styling introspection
+
+This completes comprehensive formatting introspection for shapes, enabling AI tools to understand and manipulate all visual styling aspects of PowerPoint objects.
+
 ### **Next Immediate Priorities**
-1. **FEP-006:** LineFormat introspection (MEDIUM priority)
-2. **FEP-007:** Font introspection (HIGH priority)
-3. **FEP-008:** AutoShape introspection (HIGH priority)
-4. **FEP-009:** TextFrame & Paragraph introspection (HIGH priority)
+1. **FEP-007:** Font introspection (HIGH priority)
+2. **FEP-008:** AutoShape introspection (HIGH priority)
+3. **FEP-009:** TextFrame & Paragraph introspection (HIGH priority)
+4. **FEP-012:** Slide introspection (HIGH priority)
 
 This roadmap provides the complete foundation for systematically implementing all remaining FEPs while maintaining consistency, quality, and performance across the entire python-pptx introspection enhancement.
 
