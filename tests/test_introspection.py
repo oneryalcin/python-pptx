@@ -5,7 +5,8 @@ from pptx.introspection import IntrospectionMixin
 from pptx.dml.color import RGBColor, ColorFormat
 from pptx.util import Emu, Inches # For testing Length formatting
 from pptx.enum.shapes import MSO_SHAPE_TYPE, MSO_AUTO_SHAPE_TYPE, PROG_ID, PP_PLACEHOLDER  # For testing enum formatting
-from pptx.enum.dml import MSO_COLOR_TYPE, MSO_LINE_DASH_STYLE, MSO_THEME_COLOR  # For testing enum formatting
+from pptx.enum.dml import MSO_COLOR_TYPE, MSO_LINE_DASH_STYLE, MSO_THEME_COLOR, MSO_FILL  # For testing enum formatting
+from pptx.dml.fill import FillFormat, _GradientStop  # For testing FillFormat introspection
 from pptx.shapes.base import BaseShape, _PlaceholderFormat  # For testing BaseShape introspection
 
 class MyObjectWithRGB(IntrospectionMixin):
@@ -1102,6 +1103,468 @@ class TestIntrospectionMixin(unittest.TestCase):
         result = color_format.to_dict()
         
         # Relationships should be empty for ColorFormat
+        self.assertEqual(result['relationships'], {})
+
+    def test_fillformat_solid_introspection(self):
+        """Test that FillFormat with solid fill is properly serialized."""
+        # Create a test FillFormat with solid fill
+        class MockFillFormatSolid(FillFormat):
+            def __init__(self, fore_color):
+                # Skip parent initialization for testing
+                self._fill_type = MSO_FILL.SOLID
+                self._fore_color = fore_color
+                
+            @property
+            def type(self):
+                return self._fill_type
+                
+            @property
+            def fore_color(self):
+                return self._fore_color
+                
+            @property
+            def back_color(self):
+                raise TypeError("fill type _SolidFill has no background color")
+                
+            @property
+            def pattern(self):
+                raise TypeError("fill type _SolidFill has no pattern")
+                
+            @property
+            def gradient_stops(self):
+                raise TypeError("Fill is not of type MSO_FILL_TYPE.GRADIENT")
+                
+            @property
+            def gradient_angle(self):
+                raise TypeError("Fill is not of type MSO_FILL_TYPE.GRADIENT")
+                
+            @property
+            def rId(self):
+                raise NotImplementedError(".rId property must be implemented on _SolidFill")
+        
+        # Create mock color format
+        class MockColorFormat(IntrospectionMixin):
+            def _to_dict_properties(self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm):
+                return {"type": {"name": "RGB"}, "rgb": {"hex": "FF0000"}}
+            
+            def _to_dict_llm_context(self, _visited_ids, max_depth, expand_collections, format_for_llm, include_private):
+                return {"summary": "Solid RGB color: #FF0000"}
+        
+        fill_format = MockFillFormatSolid(MockColorFormat())
+        result = fill_format.to_dict()
+        
+        # Check basic structure
+        self.assertEqual(result['_object_type'], 'MockFillFormatSolid')
+        self.assertIn('_identity', result)
+        self.assertIn('properties', result)
+        self.assertIn('_llm_context', result)
+        
+        # Check identity
+        identity = result['_identity']
+        self.assertEqual(identity['description'], 'Represents the fill formatting of an object.')
+        
+        # Check properties
+        props = result['properties']
+        self.assertEqual(props['type']['name'], 'SOLID')
+        self.assertIsNotNone(props['fore_color'])
+        self.assertEqual(props['fore_color']['_object_type'], 'MockColorFormat')
+        
+        # Other properties should be None for solid fill
+        self.assertIsNone(props['back_color'])
+        self.assertIsNone(props['pattern'])
+        self.assertIsNone(props['gradient_stops'])
+        self.assertIsNone(props['gradient_angle'])
+        self.assertIsNone(props['image_rId'])
+        
+        # Check LLM context
+        context = result['_llm_context']
+        self.assertIn('Solid fill', context['summary'])
+
+    def test_fillformat_gradient_introspection(self):
+        """Test that FillFormat with gradient fill is properly serialized."""
+        # Create a test FillFormat with gradient fill
+        class MockFillFormatGradient(FillFormat):
+            def __init__(self, gradient_stops, gradient_angle=45.0):
+                self._fill_type = MSO_FILL.GRADIENT
+                self._gradient_stops = gradient_stops
+                self._gradient_angle = gradient_angle
+                
+            @property
+            def type(self):
+                return self._fill_type
+                
+            @property
+            def gradient_stops(self):
+                return self._gradient_stops
+                
+            @property
+            def gradient_angle(self):
+                return self._gradient_angle
+                
+            @property
+            def fore_color(self):
+                raise TypeError("fill type _GradFill has no foreground color")
+                
+            @property
+            def back_color(self):
+                raise TypeError("fill type _GradFill has no background color")
+                
+            @property
+            def pattern(self):
+                raise TypeError("fill type _GradFill has no pattern")
+                
+            @property
+            def rId(self):
+                raise NotImplementedError(".rId property must be implemented on _GradFill")
+        
+        # Create mock gradient stops
+        class MockGradientStop:
+            def __init__(self, position, color_summary):
+                self.position = position
+                self.color_summary = color_summary
+                
+            def to_dict(self, **kwargs):
+                return {
+                    "_object_type": "_GradientStop",
+                    "properties": {"position": self.position, "color": {"hex": "123456"}},
+                    "_llm_context": {"summary": f"Gradient stop at {self.position*100:.0f}% with {self.color_summary}"}
+                }
+        
+        class MockGradientStops:
+            def __init__(self, stops):
+                self.stops = stops
+                
+            def __len__(self):
+                return len(self.stops)
+                
+            def __iter__(self):
+                return iter(self.stops)
+        
+        stops = MockGradientStops([
+            MockGradientStop(0.0, "red color"),
+            MockGradientStop(1.0, "blue color")
+        ])
+        
+        fill_format = MockFillFormatGradient(stops, 90.0)
+        result = fill_format.to_dict(max_depth=3)  # Ensure enough depth for stops expansion
+        
+        # Check properties
+        props = result['properties']
+        self.assertEqual(props['type']['name'], 'GRADIENT')
+        self.assertEqual(props['gradient_angle'], 90.0)
+        self.assertIsInstance(props['gradient_stops'], list)
+        self.assertEqual(len(props['gradient_stops']), 2)
+        
+        # Check first gradient stop
+        stop1 = props['gradient_stops'][0]
+        self.assertEqual(stop1['_object_type'], '_GradientStop')
+        self.assertEqual(stop1['properties']['position'], 0.0)
+        
+        # Other properties should be None for gradient fill
+        self.assertIsNone(props['fore_color'])
+        self.assertIsNone(props['back_color'])
+        self.assertIsNone(props['pattern'])
+        self.assertIsNone(props['image_rId'])
+        
+        # Check LLM context
+        context = result['_llm_context']
+        self.assertIn('2-stop gradient', context['summary'])
+        self.assertIn('90 degrees', context['summary'])
+
+    def test_fillformat_pattern_introspection(self):
+        """Test that FillFormat with pattern fill is properly serialized."""
+        # Create a test FillFormat with pattern fill
+        class MockFillFormatPattern(FillFormat):
+            def __init__(self, fore_color, back_color, pattern):
+                self._fill_type = MSO_FILL.PATTERNED
+                self._fore_color = fore_color
+                self._back_color = back_color
+                self._pattern = pattern
+                
+            @property
+            def type(self):
+                return self._fill_type
+                
+            @property
+            def fore_color(self):
+                return self._fore_color
+                
+            @property
+            def back_color(self):
+                return self._back_color
+                
+            @property
+            def pattern(self):
+                return self._pattern
+                
+            @property
+            def gradient_stops(self):
+                raise TypeError("Fill is not of type MSO_FILL_TYPE.GRADIENT")
+                
+            @property
+            def gradient_angle(self):
+                raise TypeError("Fill is not of type MSO_FILL_TYPE.GRADIENT")
+                
+            @property
+            def rId(self):
+                raise NotImplementedError(".rId property must be implemented on _PattFill")
+        
+        # Create mock color and pattern
+        class MockColorFormat(IntrospectionMixin):
+            def __init__(self, color_name):
+                super().__init__()
+                self.color_name = color_name
+                
+            def _to_dict_properties(self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm):
+                return {"color": self.color_name}
+        
+        class MockPattern:
+            def __init__(self, name):
+                self.name = name
+                
+            def __repr__(self):
+                return f"MockPattern({self.name})"
+        
+        fill_format = MockFillFormatPattern(
+            MockColorFormat("red"), MockColorFormat("white"), MockPattern("CROSS")
+        )
+        result = fill_format.to_dict()
+        
+        # Check properties
+        props = result['properties']
+        self.assertEqual(props['type']['name'], 'PATTERNED')
+        self.assertIsNotNone(props['fore_color'])
+        self.assertEqual(props['fore_color']['_object_type'], 'MockColorFormat')
+        self.assertIsNotNone(props['back_color'])
+        self.assertEqual(props['back_color']['_object_type'], 'MockColorFormat')
+        # Pattern is a simple object, so it gets converted to repr string
+        self.assertIn('CROSS', str(props['pattern']))
+        
+        # Other properties should be None for pattern fill
+        self.assertIsNone(props['gradient_stops'])
+        self.assertIsNone(props['gradient_angle'])
+        self.assertIsNone(props['image_rId'])
+        
+        # Check LLM context
+        context = result['_llm_context']
+        self.assertIn('Patterned fill', context['summary'])
+        self.assertIn('CROSS', context['summary'])
+
+    def test_fillformat_picture_introspection(self):
+        """Test that FillFormat with picture fill is properly serialized."""
+        # Create a test FillFormat with picture fill
+        class MockFillFormatPicture(FillFormat):
+            def __init__(self, rId):
+                self._fill_type = MSO_FILL.PICTURE
+                self._rId = rId
+                
+            @property
+            def type(self):
+                return self._fill_type
+                
+            @property
+            def rId(self):
+                return self._rId
+                
+            @property
+            def fore_color(self):
+                raise TypeError("fill type _BlipFill has no foreground color")
+                
+            @property
+            def back_color(self):
+                raise TypeError("fill type _BlipFill has no background color")
+                
+            @property
+            def pattern(self):
+                raise TypeError("fill type _BlipFill has no pattern")
+                
+            @property
+            def gradient_stops(self):
+                raise TypeError("Fill is not of type MSO_FILL_TYPE.GRADIENT")
+                
+            @property
+            def gradient_angle(self):
+                raise TypeError("Fill is not of type MSO_FILL_TYPE.GRADIENT")
+        
+        fill_format = MockFillFormatPicture("rId5")
+        result = fill_format.to_dict()
+        
+        # Check properties
+        props = result['properties']
+        self.assertEqual(props['type']['name'], 'PICTURE')
+        self.assertEqual(props['image_rId'], 'rId5')
+        
+        # Other properties should be None for picture fill
+        self.assertIsNone(props['fore_color'])
+        self.assertIsNone(props['back_color'])
+        self.assertIsNone(props['pattern'])
+        self.assertIsNone(props['gradient_stops'])
+        self.assertIsNone(props['gradient_angle'])
+        
+        # Check LLM context
+        context = result['_llm_context']
+        self.assertIn('Picture fill', context['summary'])
+        self.assertIn('rId5', context['summary'])
+
+    def test_fillformat_background_introspection(self):
+        """Test that FillFormat with background fill is properly serialized."""
+        # Create a test FillFormat with background fill
+        class MockFillFormatBackground(FillFormat):
+            def __init__(self):
+                self._fill_type = MSO_FILL.BACKGROUND
+                
+            @property
+            def type(self):
+                return self._fill_type
+                
+            @property
+            def fore_color(self):
+                raise TypeError("fill type _NoFill has no foreground color")
+                
+            @property
+            def back_color(self):
+                raise TypeError("fill type _NoFill has no background color")
+                
+            @property
+            def pattern(self):
+                raise TypeError("fill type _NoFill has no pattern")
+                
+            @property
+            def gradient_stops(self):
+                raise TypeError("Fill is not of type MSO_FILL_TYPE.GRADIENT")
+                
+            @property
+            def gradient_angle(self):
+                raise TypeError("Fill is not of type MSO_FILL_TYPE.GRADIENT")
+                
+            @property
+            def rId(self):
+                raise NotImplementedError(".rId property must be implemented on _NoFill")
+        
+        fill_format = MockFillFormatBackground()
+        result = fill_format.to_dict()
+        
+        # Check properties
+        props = result['properties']
+        self.assertEqual(props['type']['name'], 'BACKGROUND')
+        
+        # All specific properties should be None for background fill
+        self.assertIsNone(props['fore_color'])
+        self.assertIsNone(props['back_color'])
+        self.assertIsNone(props['pattern'])
+        self.assertIsNone(props['gradient_stops'])
+        self.assertIsNone(props['gradient_angle'])
+        self.assertIsNone(props['image_rId'])
+        
+        # Check LLM context
+        context = result['_llm_context']
+        self.assertIn('Background fill (transparent)', context['summary'])
+
+    def test_fillformat_none_introspection(self):
+        """Test that FillFormat with no fill defined is properly serialized."""
+        # Create a test FillFormat with None fill type
+        class MockFillFormatNone(FillFormat):
+            def __init__(self):
+                self._fill_type = None
+                
+            @property
+            def type(self):
+                return self._fill_type
+                
+            @property
+            def fore_color(self):
+                raise TypeError("fill type _NoneFill has no foreground color")
+                
+            @property
+            def back_color(self):
+                raise TypeError("fill type _NoneFill has no background color")
+                
+            @property
+            def pattern(self):
+                raise TypeError("fill type _NoneFill has no pattern")
+                
+            @property
+            def gradient_stops(self):
+                raise TypeError("Fill is not of type MSO_FILL_TYPE.GRADIENT")
+                
+            @property
+            def gradient_angle(self):
+                raise TypeError("Fill is not of type MSO_FILL_TYPE.GRADIENT")
+                
+            @property
+            def rId(self):
+                raise NotImplementedError(".rId property must be implemented on _NoneFill")
+        
+        fill_format = MockFillFormatNone()
+        result = fill_format.to_dict()
+        
+        # Check properties
+        props = result['properties']
+        self.assertIsNone(props['type'])
+        
+        # All specific properties should be None for no fill
+        self.assertIsNone(props['fore_color'])
+        self.assertIsNone(props['back_color'])
+        self.assertIsNone(props['pattern'])
+        self.assertIsNone(props['gradient_stops'])
+        self.assertIsNone(props['gradient_angle'])
+        self.assertIsNone(props['image_rId'])
+        
+        # Check LLM context
+        context = result['_llm_context']
+        self.assertIn('No explicit fill defined', context['summary'])
+
+    def test_gradient_stop_introspection(self):
+        """Test that _GradientStop is properly serialized."""
+        # Create a test _GradientStop
+        class MockGradientStop(_GradientStop):
+            def __init__(self, position, color):
+                # Skip parent initialization for testing
+                self._position = position
+                self._color = color
+                
+            @property
+            def position(self):
+                return self._position
+                
+            @property
+            def color(self):
+                return self._color
+        
+        # Create mock color
+        class MockColorFormat(IntrospectionMixin):
+            def _to_dict_properties(self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm):
+                return {"type": {"name": "RGB"}, "rgb": {"hex": "00FF00"}}
+            
+            def _to_dict_llm_context(self, _visited_ids, max_depth, expand_collections, format_for_llm, include_private):
+                return {"summary": "Solid RGB color: #00FF00"}
+        
+        gradient_stop = MockGradientStop(0.5, MockColorFormat())
+        result = gradient_stop.to_dict()
+        
+        # Check basic structure
+        self.assertEqual(result['_object_type'], 'MockGradientStop')
+        self.assertIn('_identity', result)
+        self.assertIn('properties', result)
+        self.assertIn('_llm_context', result)
+        
+        # Check identity
+        identity = result['_identity']
+        self.assertEqual(identity['description'], 'Represents a color stop in a gradient.')
+        
+        # Check properties
+        props = result['properties']
+        self.assertEqual(props['position'], 0.5)
+        self.assertIsNotNone(props['color'])
+        self.assertEqual(props['color']['_object_type'], 'MockColorFormat')
+        
+        # Check LLM context
+        context = result['_llm_context']
+        self.assertIn('Gradient stop at 50% position', context['summary'])
+        # The color summary should be accessible
+        self.assertIn('color', context['summary'])
+        
+        # Relationships should be empty for GradientStop
         self.assertEqual(result['relationships'], {})
 
 
