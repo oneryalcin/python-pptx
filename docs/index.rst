@@ -25,6 +25,7 @@ Feature Support
 
 * Round-trip any Open XML presentation (.pptx file) including all its elements
 * Add slides
+* Add and customize slide layouts, including adding placeholders
 * Populate text placeholders, for example to create a bullet slide
 * Add image to slide at arbitrary position and size
 * Add textbox to a slide; manipulate text font size and bold
@@ -110,9 +111,4 @@ Contributor Guide
 .. toctree::
    :maxdepth: 1
 
-   dev/runtests
-   dev/xmlchemy
-   dev/development_practices
-   dev/philosophy
-   dev/analysis/index
-   dev/resources/index
+   dev/index

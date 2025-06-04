@@ -340,6 +340,16 @@ class SlideLayout(_BaseSlide):
         slides = self.part.package.presentation_part.presentation.slides
         return tuple(s for s in slides if s.slide_layout == self)
 
+    @property
+    def layout_type(self) -> str:
+        """Type of this slide layout, e.g. 'title', 'picObj'.
+
+        This is the value of the `type` attribute on the `p:sldLayout`
+        element. It will be a member of `pptx.enum.slide.ST_SlideLayoutType`
+        if a standard layout type, but can also be a custom string.
+        """
+        return self._element.type
+
 
 class SlideLayouts(ParentedElementProxy):
     """Sequence of slide layouts belonging to a slide-master.
@@ -369,6 +379,20 @@ class SlideLayouts(ParentedElementProxy):
     def __len__(self) -> int:
         """Support len() built-in function, e.g. `len(slides) == 4`."""
         return len(self._sldLayoutIdLst)
+
+    def add_layout(self, name: str, base_type: str) -> SlideLayout:
+        """Return a newly added slide layout.
+
+        The new slide layout is named *name* and is of *base_type*.
+        It is added to this collection.
+        """
+        # ---Ensure SlideLayoutPart is imported---
+        from pptx.parts.slide import SlideLayoutPart
+
+        slide_master_part = self._parent.part
+        slide_layout_part = SlideLayoutPart.new(name, base_type, slide_master_part)
+        new_slide_layout = slide_layout_part.slide_layout
+        return new_slide_layout
 
     def get_by_name(self, name: str, default: SlideLayout | None = None) -> SlideLayout | None:
         """Return SlideLayout object having `name`, or `default` if not found."""
