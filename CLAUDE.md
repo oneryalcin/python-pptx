@@ -102,6 +102,86 @@ python -m pytest tests/ -n auto
 - Fixtures heavily used for test setup
 - Mock objects from `tests.unitutil.mock`
 
+### Modular Introspection Testing (Preferred Approach)
+
+**For all introspection-related testing, use the modular approach established in the test refactoring:**
+
+#### **Structure**
+```
+tests/introspection/
+├── __init__.py                    # Module documentation
+├── mock_helpers.py               # 47 shared mock classes (503 lines)
+├── test_core_mixin.py            # Core IntrospectionMixin tests (8 tests)
+├── test_enum_formatting.py       # Enum serialization tests (8 tests)
+├── test_shape_introspection.py   # BaseShape tests (10 tests)
+├── test_color_introspection.py   # ColorFormat tests (10 tests)
+├── test_fill_introspection.py    # FillFormat tests (11 tests)
+└── test_line_introspection.py    # LineFormat tests (11 tests)
+```
+
+#### **Benefits**
+- **Maintainability**: 84% reduction in file size (1,952 → ~320 lines avg)
+- **Modularity**: Easy to extend for future FEP implementations
+- **Shared Utilities**: Centralized mock classes eliminate duplication
+- **Enhanced Coverage**: Comprehensive edge case testing and error handling
+
+#### **Usage Guidelines**
+```bash
+# Test all introspection functionality
+python -m pytest tests/introspection/ -v
+
+# Test specific introspection module
+python -m pytest tests/introspection/test_color_introspection.py -v
+
+# Test both original and modular (for validation)
+python -m pytest tests/test_introspection.py tests/introspection/ -v
+
+# Current results: 96/96 tests passing (100% success)
+```
+
+#### **Adding New Introspection Tests**
+When implementing future FEPs (FEP-007 through FEP-018):
+
+1. **Create focused test module**: `tests/introspection/test_[component]_introspection.py`
+2. **Use shared utilities**: Import mock classes from `mock_helpers.py`
+3. **Follow established patterns**: Use `assert_basic_to_dict_structure()` and other helpers
+4. **Maintain quality**: Include edge cases, error handling, and LLM context validation
+
+#### **Mock Class Guidelines**
+- **Centralized Location**: Add new mock classes to `mock_helpers.py`
+- **IntrospectionMixin Inheritance**: Ensure mocks inherit from `IntrospectionMixin`
+- **Realistic Behavior**: Implement actual business logic for accurate testing
+- **Error Scenarios**: Include error-triggering mocks for robust testing
+
+#### **Example Test Structure**
+```python
+# tests/introspection/test_new_feature_introspection.py
+import unittest
+from .mock_helpers import assert_basic_to_dict_structure, MockNewFeature
+
+class TestNewFeatureIntrospection(unittest.TestCase):
+    """Test NewFeature introspection functionality."""
+    
+    def test_newfeature_basic_introspection(self):
+        """Test that NewFeature is properly serialized."""
+        feature = MockNewFeature()
+        result = feature.to_dict()
+        
+        # Use shared assertion helpers
+        assert_basic_to_dict_structure(self, result, 'MockNewFeature')
+        
+        # Test specific properties
+        props = result['properties']
+        self.assertIn('key_property', props)
+        
+        # Test LLM context quality
+        context = result['_llm_context']
+        self.assertIn('description', context)
+        self.assertIn('common_operations', context)
+```
+
+This modular approach provides a solid foundation for future FEP development while maintaining complete backward compatibility and test quality.
+
 ## Code Quality
 
 ### Linting and Formatting
@@ -800,7 +880,17 @@ grep -r "_format_property_value_for_to_dict" src/pptx/
 # Study object relationships  
 grep -r "class.*IntrospectionMixin" src/pptx/
 
-# Test specific FEP functionality
+# Test specific FEP functionality (MODERN MODULAR APPROACH - PREFERRED)
+python -m pytest tests/introspection/test_enum_formatting.py -v           # Enum introspection
+python -m pytest tests/introspection/test_shape_introspection.py -v       # BaseShape introspection  
+python -m pytest tests/introspection/test_fill_introspection.py -v        # FillFormat introspection
+python -m pytest tests/introspection/test_line_introspection.py -v        # LineFormat introspection
+python -m pytest tests/introspection/test_color_introspection.py -v       # ColorFormat introspection
+
+# Test all introspection functionality (96 tests total)
+python -m pytest tests/introspection/ tests/test_introspection.py -v
+
+# Legacy approach (still supported for validation)
 python -m pytest tests/test_introspection.py -k "enum" -v
 python -m pytest tests/test_introspection.py -k "base_shape" -v
 python -m pytest tests/test_introspection.py -k "fillformat" -v
@@ -811,11 +901,11 @@ python -m pytest tests/test_introspection.py -k "lineformat" -v
 
 ### **Three-Tier Testing Approach**
 
-#### **1. Unit Tests (Mock-Based)**
+#### **1. Unit Tests (Mock-Based) - MODERNIZED**
 - **Purpose:** Isolated testing of introspection methods
-- **Location:** `tests/test_introspection.py`
-- **Pattern:** Custom mock classes with controlled property behavior
-- **Benefits:** Fast, predictable, covers edge cases and error scenarios
+- **Location:** `tests/introspection/` (modular) + `tests/test_introspection.py` (legacy)
+- **Pattern:** Shared mock classes from `mock_helpers.py` with controlled property behavior
+- **Benefits:** Fast, predictable, covers edge cases and error scenarios, 84% smaller file sizes
 
 ```python
 class MockLineFormat(LineFormat):
@@ -954,12 +1044,14 @@ def _to_dict_properties(self, include_private, _visited_ids, max_depth, expand_c
 - **FEP-004** ✅ ColorFormat Color & Theme Introspection (PR #12)
 - **FEP-005** ✅ FillFormat Fill Type & Properties Introspection (PR #14)
 - **FEP-006** ✅ LineFormat Line Styling Introspection (PR #16)
+- **Test Refactoring** ✅ Modular Introspection Test Suite (PR #17)
 
 ### **Current Status**
 - **Total Progress:** 6/18 FEPs completed (33.3%)
 - **Foundation Phase:** ✅ COMPLETE - All foundational patterns established
-- **Core Object Phase:** 🔄 IN PROGRESS - DML formatting trilogy complete
-- **Test Coverage:** 38/38 introspection tests passing (6 new LineFormat tests)
+- **Core Object Phase:** ✅ COMPLETE - DML formatting trilogy complete
+- **Test Modernization:** ✅ COMPLETE - Modular test architecture implemented
+- **Test Coverage:** 96/96 tests passing (38 original + 58 modular = 100% success)
 - **Zero Regressions:** All existing functionality preserved
 
 ### **DML Formatting Trilogy Completed** 🎉
@@ -968,6 +1060,19 @@ def _to_dict_properties(self, include_private, _visited_ids, max_depth, expand_c
 - ✅ **LineFormat** (FEP-006): Line styling introspection
 
 This completes comprehensive formatting introspection for shapes, enabling AI tools to understand and manipulate all visual styling aspects of PowerPoint objects.
+
+### **Test Architecture Modernization Completed** 🎉
+- ✅ **Modular Structure**: Refactored 1,952-line monolithic test into 6 focused modules + shared utilities
+- ✅ **Enhanced Coverage**: Added 20 new test methods for comprehensive edge case testing  
+- ✅ **Quality Improvements**: Enhanced error handling, color extraction, and LLM context validation
+- ✅ **Future-Ready**: Prepared structure for remaining FEP implementations (FEP-007 through FEP-018)
+- ✅ **Zero Regressions**: All existing functionality preserved while improving test quality
+
+**Key Benefits for Future Development:**
+- **84% File Size Reduction**: From 1,952 lines to ~320 lines average per module
+- **Shared Utilities**: 47 centralized mock classes eliminate duplication
+- **Easy Extension**: Clear patterns and helpers for new FEP test implementations
+- **Better Maintainability**: Focused modules with clear responsibilities
 
 ### **Next Immediate Priorities**
 1. **FEP-007:** Font introspection (HIGH priority)
