@@ -1567,6 +1567,385 @@ class TestIntrospectionMixin(unittest.TestCase):
         # Relationships should be empty for GradientStop
         self.assertEqual(result['relationships'], {})
 
+    def test_lineformat_solid_introspection(self):
+        """Test that LineFormat with solid fill is properly serialized."""
+        from pptx.dml.line import LineFormat
+        from pptx.util import Pt
+        
+        # Create a test LineFormat with solid fill
+        class MockLineFormat(LineFormat):
+            def __init__(self):
+                # Skip parent initialization for testing
+                self._width = Pt(2.5)
+                self._dash_style = MSO_LINE_DASH_STYLE.DASH
+                self._fill = MockFillFormat("SOLID")
+                
+            @property
+            def width(self):
+                return self._width
+                
+            @property
+            def dash_style(self):
+                return self._dash_style
+                
+            @property
+            def fill(self):
+                return self._fill
+        
+        # Create mock fill format
+        class MockFillFormat(IntrospectionMixin):
+            def __init__(self, fill_type):
+                self._type = fill_type
+            
+            @property
+            def type(self):
+                return MSO_FILL.SOLID if self._type == "SOLID" else None
+                
+            def _to_dict_properties(self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm):
+                return {
+                    "type": {"_object_type": "MSO_FILL", "name": "SOLID", "value": 1},
+                    "fore_color": {"_object_type": "ColorFormat", "rgb": {"hex": "0000FF"}}
+                }
+            
+            def _to_dict_llm_context(self, _visited_ids, max_depth, expand_collections, format_for_llm, include_private):
+                return {"summary": "Solid fill with Solid RGB color: #0000FF (R:0, G:0, B:255)."}
+        
+        line = MockLineFormat()
+        result = line.to_dict()
+        
+        # Check basic structure
+        self.assertIn('_object_type', result)
+        self.assertIn('properties', result)
+        self.assertIn('_llm_context', result)
+        
+        # Check properties
+        props = result['properties']
+        self.assertIn('fill', props)
+        self.assertIn('width', props)
+        self.assertIn('dash_style', props)
+        
+        # Check fill properties
+        fill_props = props['fill']
+        self.assertEqual(fill_props['_object_type'], 'MockFillFormat')
+        
+        # Check width (Length object)
+        width_props = props['width']
+        self.assertEqual(width_props['_object_type'], 'Pt')
+        self.assertEqual(width_props['pt'], 2.5)
+        
+        # Check dash style (enum)
+        dash_props = props['dash_style']
+        self.assertEqual(dash_props['_object_type'], 'MSO_LINE_DASH_STYLE')
+        self.assertEqual(dash_props['name'], 'DASH')
+        
+        # Check LLM context
+        context = result['_llm_context']
+        self.assertIn('DASH line, 2.50pt', context['summary'])
+
+    def test_lineformat_no_line_introspection(self):
+        """Test that LineFormat with no line (background fill) is properly serialized."""
+        from pptx.dml.line import LineFormat
+        from pptx.util import Pt
+        
+        # Create a test LineFormat with background fill (no line)
+        class MockLineFormat(LineFormat):
+            def __init__(self):
+                # Skip parent initialization for testing
+                self._width = Pt(0)  # Zero width = no line
+                self._dash_style = None
+                self._fill = MockFillFormat("BACKGROUND")
+                
+            @property
+            def width(self):
+                return self._width
+                
+            @property
+            def dash_style(self):
+                return self._dash_style
+                
+            @property
+            def fill(self):
+                return self._fill
+        
+        # Create mock fill format for background
+        class MockFillFormat(IntrospectionMixin):
+            def __init__(self, fill_type):
+                self._type = fill_type
+            
+            @property
+            def type(self):
+                return MSO_FILL.BACKGROUND if self._type == "BACKGROUND" else None
+                
+            def _to_dict_properties(self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm):
+                return {
+                    "type": {"_object_type": "MSO_FILL", "name": "BACKGROUND", "value": 5}
+                }
+            
+            def _to_dict_llm_context(self, _visited_ids, max_depth, expand_collections, format_for_llm, include_private):
+                return {"summary": "Background fill (no fill)."}
+        
+        line = MockLineFormat()
+        result = line.to_dict()
+        
+        # Check basic structure
+        self.assertIn('_object_type', result)
+        self.assertIn('properties', result)
+        self.assertIn('_llm_context', result)
+        
+        # Check properties
+        props = result['properties']
+        self.assertIn('fill', props)
+        self.assertIn('width', props)
+        self.assertIn('dash_style', props)
+        
+        # Check width is zero
+        width_props = props['width']
+        self.assertEqual(width_props['pt'], 0.0)
+        
+        # Check dash style is None
+        self.assertIsNone(props['dash_style'])
+        
+        # Check LLM context indicates no line
+        context = result['_llm_context']
+        self.assertIn('No line', context['summary'])
+
+    def test_lineformat_gradient_introspection(self):
+        """Test that LineFormat with gradient fill is properly serialized."""
+        from pptx.dml.line import LineFormat
+        from pptx.util import Pt
+        
+        # Create a test LineFormat with gradient fill
+        class MockLineFormat(LineFormat):
+            def __init__(self):
+                # Skip parent initialization for testing
+                self._width = Pt(1.5)
+                self._dash_style = MSO_LINE_DASH_STYLE.DASH_DOT
+                self._fill = MockFillFormat("GRADIENT")
+                
+            @property
+            def width(self):
+                return self._width
+                
+            @property
+            def dash_style(self):
+                return self._dash_style
+                
+            @property
+            def fill(self):
+                return self._fill
+        
+        # Create mock fill format for gradient
+        class MockFillFormat(IntrospectionMixin):
+            def __init__(self, fill_type):
+                self._type = fill_type
+            
+            @property
+            def type(self):
+                return MSO_FILL.GRADIENT if self._type == "GRADIENT" else None
+                
+            def _to_dict_properties(self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm):
+                return {
+                    "type": {"_object_type": "MSO_FILL", "name": "GRADIENT", "value": 3},
+                    "gradient_angle": 45.0,
+                    "gradient_stops": [{"position": 0.0}, {"position": 1.0}]
+                }
+            
+            def _to_dict_llm_context(self, _visited_ids, max_depth, expand_collections, format_for_llm, include_private):
+                return {"summary": "2-stop gradient at 45 degrees."}
+        
+        line = MockLineFormat()
+        result = line.to_dict()
+        
+        # Check basic structure
+        self.assertIn('_object_type', result)
+        self.assertIn('properties', result)
+        self.assertIn('_llm_context', result)
+        
+        # Check properties
+        props = result['properties']
+        self.assertIn('fill', props)
+        
+        # Check fill properties for gradient
+        fill_props = props['fill']
+        self.assertEqual(fill_props['_object_type'], 'MockFillFormat')
+        
+        # Check dash style
+        dash_props = props['dash_style']
+        self.assertEqual(dash_props['name'], 'DASH_DOT')
+        
+        # Check LLM context mentions gradient
+        context = result['_llm_context']
+        self.assertIn('DASH_DOT gradient line', context['summary'])
+
+    def test_lineformat_pattern_introspection(self):
+        """Test that LineFormat with pattern fill is properly serialized."""
+        from pptx.dml.line import LineFormat
+        from pptx.util import Pt
+        
+        # Create a test LineFormat with pattern fill
+        class MockLineFormat(LineFormat):
+            def __init__(self):
+                # Skip parent initialization for testing
+                self._width = Pt(3.0)
+                self._dash_style = MSO_LINE_DASH_STYLE.SOLID
+                self._fill = MockFillFormat("PATTERNED")
+                
+            @property
+            def width(self):
+                return self._width
+                
+            @property
+            def dash_style(self):
+                return self._dash_style
+                
+            @property
+            def fill(self):
+                return self._fill
+        
+        # Create mock fill format for pattern
+        class MockFillFormat(IntrospectionMixin):
+            def __init__(self, fill_type):
+                self._type = fill_type
+                self._pattern = MockPattern()
+            
+            @property
+            def type(self):
+                return MSO_FILL.PATTERNED if self._type == "PATTERNED" else None
+                
+            @property
+            def pattern(self):
+                return self._pattern
+                
+            def _to_dict_properties(self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm):
+                return {
+                    "type": {"_object_type": "MSO_FILL", "name": "PATTERNED", "value": 2},
+                    "pattern": {"name": "DIAGONAL_CROSS"}
+                }
+            
+            def _to_dict_llm_context(self, _visited_ids, max_depth, expand_collections, format_for_llm, include_private):
+                return {"summary": "DIAGONAL_CROSS patterned fill."}
+        
+        class MockPattern:
+            @property
+            def name(self):
+                return "DIAGONAL_CROSS"
+        
+        line = MockLineFormat()
+        result = line.to_dict()
+        
+        # Check properties
+        props = result['properties']
+        
+        # Check width
+        width_props = props['width']
+        self.assertEqual(width_props['pt'], 3.0)
+        
+        # Check LLM context mentions pattern
+        context = result['_llm_context']
+        self.assertIn('DIAGONAL_CROSS patterned line', context['summary'])
+        self.assertIn('3.00pt', context['summary'])
+
+    def test_lineformat_common_operations_context(self):
+        """Test that LineFormat provides useful common operations in LLM context."""
+        from pptx.dml.line import LineFormat
+        
+        # Create a basic test LineFormat
+        class MockLineFormat(LineFormat):
+            def __init__(self):
+                self._width = Emu(0)
+                self._dash_style = None
+                self._fill = MockFillFormat()
+                
+            @property
+            def width(self):
+                return self._width
+                
+            @property
+            def dash_style(self):
+                return self._dash_style
+                
+            @property
+            def fill(self):
+                return self._fill
+        
+        class MockFillFormat(IntrospectionMixin):
+            @property
+            def type(self):
+                return None
+                
+            def _to_dict_properties(self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm):
+                return {"type": None}
+            
+            def _to_dict_llm_context(self, _visited_ids, max_depth, expand_collections, format_for_llm, include_private):
+                return {"summary": "No fill."}
+        
+        line = MockLineFormat()
+        result = line.to_dict()
+        
+        # Check LLM context includes common operations
+        context = result['_llm_context']
+        self.assertIn('common_operations', context)
+        
+        operations = context['common_operations']
+        
+        # Check for key operations
+        expected_operations = [
+            "set line color",
+            "set line width", 
+            "set dash style",
+            "remove line",
+            "set solid fill"
+        ]
+        
+        for expected_op in expected_operations:
+            found = any(expected_op in op for op in operations)
+            self.assertTrue(found, f"Expected operation '{expected_op}' not found in: {operations}")
+
+    def test_lineformat_error_handling(self):
+        """Test that LineFormat introspection handles errors gracefully."""
+        from pptx.dml.line import LineFormat
+        
+        # Create a test LineFormat that will raise errors
+        class MockLineFormat(LineFormat):
+            def __init__(self):
+                pass  # Skip initialization
+                
+            @property
+            def width(self):
+                raise ValueError("Width access error")
+                
+            @property
+            def dash_style(self):
+                raise AttributeError("Dash style access error")
+                
+            @property
+            def fill(self):
+                raise RuntimeError("Fill access error")
+        
+        line = MockLineFormat()
+        
+        # This should not crash - it should handle errors gracefully
+        result = line.to_dict()
+        
+        # Check basic structure is still present
+        self.assertIn('_object_type', result)
+        self.assertIn('properties', result)
+        self.assertIn('_llm_context', result)
+        
+        # Check that errors are handled in properties
+        props = result['properties']
+        self.assertIn('fill', props)
+        self.assertIn('width', props)
+        self.assertIn('dash_style', props)
+        
+        # Properties should contain error contexts due to the exceptions
+        # (The exact structure depends on _create_error_context implementation)
+        # The main thing is that it didn't crash
+        
+        # Check that error is handled in LLM context
+        context = result['_llm_context']
+        self.assertIn('error in analysis', context['summary'])
+
 
 if __name__ == '__main__':
     unittest.main()
