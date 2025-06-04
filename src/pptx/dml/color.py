@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pptx.enum.dml import MSO_COLOR_TYPE, MSO_THEME_COLOR
+from pptx.introspection import IntrospectionMixin
 from pptx.oxml.dml.color import (
     CT_HslColor,
     CT_PresetColor,
@@ -13,7 +14,7 @@ from pptx.oxml.dml.color import (
 )
 
 
-class ColorFormat(object):
+class ColorFormat(IntrospectionMixin):
     """
     Provides access to color settings such as RGB color, theme color, and
     luminance adjustments.
@@ -115,6 +116,96 @@ class ColorFormat(object):
         elif self.type is None:
             return None
         return str(self.type).split()[0]
+
+    # -- IntrospectionMixin overrides --
+
+    def _to_dict_identity(self, _visited_ids, max_depth, expand_collections, format_for_llm, include_private):
+        """Override to provide color-specific identity information."""
+        identity = super()._to_dict_identity(
+            _visited_ids, max_depth, expand_collections, format_for_llm, include_private
+        )
+        identity["description"] = "Represents a color definition."
+        return identity
+
+    def _to_dict_properties(self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm):
+        """Override to expose color type, RGB, theme color, and brightness properties."""
+        props = {}
+        
+        # Color type (MSO_COLOR_TYPE enum or None)
+        color_type_val = self.type
+        props["type"] = self._format_property_value_for_to_dict(
+            color_type_val, include_private, _visited_ids, max_depth, expand_collections, format_for_llm
+        )
+
+        # RGB color value (only for RGB type)
+        if color_type_val == MSO_COLOR_TYPE.RGB:
+            try:
+                props["rgb"] = self._format_property_value_for_to_dict(
+                    self.rgb, include_private, _visited_ids, max_depth, expand_collections, format_for_llm
+                )
+            except AttributeError:
+                props["rgb"] = None
+            props["theme_color"] = None  # Explicitly None if RGB
+        elif color_type_val == MSO_COLOR_TYPE.SCHEME:
+            try:
+                props["theme_color"] = self._format_property_value_for_to_dict(
+                    self.theme_color, include_private, _visited_ids, max_depth, expand_collections, format_for_llm
+                )
+            except AttributeError:
+                props["theme_color"] = None
+            props["rgb"] = None  # Explicitly None if Theme
+        else:
+            # For other types like HSL, PRESET, or None type
+            props["rgb"] = None
+            props["theme_color"] = None
+        
+        # Brightness is applicable to RGB and Scheme colors primarily
+        # For NoneColor, self.brightness access might raise an error.
+        current_brightness = 0.0
+        try:
+            current_brightness = self.brightness
+        except (ValueError, AttributeError):
+            # e.g. if color type is None or other unsupported types
+            pass 
+        props["brightness"] = current_brightness
+        
+        return props
+
+    def _to_dict_relationships(self, remaining_depth, expand_collections, _visited_ids, format_for_llm, include_private):
+        """Override to include minimal relationships (ColorFormat typically doesn't own other complex objects)."""
+        return {}
+
+    def _to_dict_llm_context(self, _visited_ids, max_depth, expand_collections, format_for_llm, include_private):
+        """Override to provide color-specific LLM context with human-readable descriptions."""
+        context = {"description": "Represents a color setting."}
+        color_type_val = self.type
+        
+        if color_type_val == MSO_COLOR_TYPE.RGB:
+            try:
+                rgb_val = self.rgb
+                context["summary"] = f"Solid RGB color: #{str(rgb_val)} (R:{rgb_val[0]}, G:{rgb_val[1]}, B:{rgb_val[2]})."
+            except AttributeError:
+                context["summary"] = "RGB color (details unavailable)."
+        elif color_type_val == MSO_COLOR_TYPE.SCHEME:
+            try:
+                theme_color_val = self.theme_color
+                brightness_val = self.brightness
+                brightness_desc = ""
+                if brightness_val > 0:
+                    brightness_desc = f", {brightness_val*100:.0f}% lighter"
+                elif brightness_val < 0:
+                    brightness_desc = f", {abs(brightness_val)*100:.0f}% darker"
+                context["summary"] = f"Theme color: {theme_color_val.name}{brightness_desc}."
+            except AttributeError:
+                context["summary"] = "Theme color (details unavailable)."
+        elif color_type_val is None:
+            context["summary"] = "No explicit color defined (color is inherited or not set)."
+        else:
+            # For HSL, PRESET etc. if they get added later
+            context["summary"] = f"Color of type {color_type_val.name if color_type_val else 'Unknown'}."
+        
+        context["common_operations"] = ["set_rgb_color", "set_theme_color", "adjust_brightness"]
+        return context
 
 
 class _Color(object):
