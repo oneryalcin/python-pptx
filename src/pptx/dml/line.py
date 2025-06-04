@@ -180,17 +180,35 @@ class LineFormat(IntrospectionMixin):
                 summary_parts.append("No line (transparent or zero width).")
 
             elif line_fill_type == MSO_FILL.SOLID:
-                # Get color summary from fill's LLM context
+                # Get color summary from fill's structured data (more robust than string parsing)
                 try:
                     fill_dict = self.fill.to_dict(
-                        max_depth=0, format_for_llm=True, _visited_ids=_visited_ids
+                        max_depth=2, format_for_llm=True, _visited_ids=_visited_ids
                     )
-                    fill_summary = fill_dict.get("_llm_context", {}).get("summary", "solid color")
-                    # Extract just the color part from fill summary
-                    if "Solid fill with " in fill_summary:
-                        color_summary = fill_summary.replace("Solid fill with ", "").rstrip(".")
-                    else:
-                        color_summary = fill_summary
+
+                    # Extract color summary directly from structured data
+                    color_summary = "solid color"  # Default fallback
+
+                    # Check if this is indeed a solid fill and get fore_color
+                    fill_props = fill_dict.get("properties", {})
+                    fill_type = fill_props.get("type", {})
+                    if isinstance(fill_type, dict) and fill_type.get("name") == "SOLID":
+                        fore_color = fill_props.get("fore_color")
+                        if fore_color and isinstance(fore_color, dict):
+                            # Try to get color summary from fore_color's LLM context
+                            fore_color_context = fore_color.get("_llm_context", {})
+                            if fore_color_context.get("summary"):
+                                color_summary = fore_color_context["summary"]
+                            else:
+                                # Fallback: construct summary from RGB or other color properties
+                                rgb_info = fore_color.get("properties", {}).get("rgb")
+                                if rgb_info and isinstance(rgb_info, dict):
+                                    hex_val = rgb_info.get("hex", "unknown")
+                                    color_summary = f"RGB color #{hex_val}"
+
+                    # If color_summary still contains "color:" or similar, clean it up
+                    if color_summary.endswith("."):
+                        color_summary = color_summary.rstrip(".")
 
                     if dash_style_name == "SOLID":
                         summary_parts.append(
