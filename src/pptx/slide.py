@@ -29,7 +29,7 @@ if TYPE_CHECKING:
         CT_SlideMaster,
     )
     from pptx.parts.presentation import PresentationPart
-    from pptx.parts.slide import SlideMasterPart, SlidePart
+    from pptx.parts.slide import SlideLayoutPart, SlideMasterPart, SlidePart
     from pptx.presentation import Presentation
     from pptx.shapes.placeholder import LayoutPlaceholder, MasterPlaceholder
     from pptx.shapes.shapetree import NotesSlidePlaceholder

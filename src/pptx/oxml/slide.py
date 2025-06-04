@@ -272,7 +272,14 @@ class CT_SlideLayout(_BaseSlideElement):
                     <p:cNvGrpSpPr/>
                     <p:nvPr/>
                   </p:nvGrpSpPr>
-                  <p:grpSpPr/>
+                  <p:grpSpPr>
+                    <a:xfrm>
+                      <a:off x="0" y="0"/>
+                      <a:ext cx="0" cy="0"/>
+                      <a:chOff x="0" y="0"/>
+                      <a:chExt cx="0" cy="0"/>
+                    </a:xfrm>
+                  </p:grpSpPr>
                 </p:spTree>
               </p:cSld>
               <p:clrMapOvr>
@@ -292,6 +299,7 @@ class CT_SlideLayoutIdList(BaseOxmlElement):
 
     sldLayoutId_lst: list[CT_SlideLayoutIdListEntry]
 
+    _add_sldLayoutId: Callable[..., CT_SlideLayoutIdListEntry]
     sldLayoutId = ZeroOrMore("p:sldLayoutId")
 
 

@@ -327,20 +327,123 @@ class SlideLayoutPart(BaseSlidePart):
         # ---relate to slide master---
         rId = slide_master_part.relate_to(slide_layout_part, RT.SLIDE_LAYOUT)
 
+        # ---CRITICAL FIX: Ensure consecutive rIds for slide layouts---
+        # PowerPoint expects slide layout rIds to be consecutive (rId1, rId2, rId3...)
+        # but other relationships (like theme) can interfere with this sequence.
+        # We need to reassign the rId to maintain consecutive numbering for layouts.
+        layout_rId = cls._ensure_consecutive_layout_rId(slide_master_part, rId, slide_layout_part)
+
         # ---update slide master's sldLayoutIdLst---
         sldMaster = slide_master_part._element
         sldLayoutIdLst = sldMaster.get_or_add_sldLayoutIdLst()
-        # ---Assuming sldMaster.next_sldLayoutId() provides the unique ID---
-        # This might need refinement if next_sldLayoutId is not directly available
-        # or if it needs a different invocation.
-        # Using a placeholder ID as per subtask instructions, as CT_SlideMaster.next_sldLayoutId()
-        # was not found. This will be refined in a later step.
-        # The typical range starts from 2147483648.
-        new_sldLayoutId = sldLayoutIdLst._add_sldLayoutId(rId=rId)
+        new_sldLayoutId = sldLayoutIdLst._add_sldLayoutId(rId=layout_rId)
         # ---Set the unique ID for the sldLayoutId entry---
         new_sldLayoutId.id = slide_master_part._element.next_sldLayoutId_id
 
         return slide_layout_part
+
+    @classmethod
+    def _ensure_consecutive_layout_rId(cls, slide_master_part, assigned_rId: str, slide_layout_part) -> str:
+        """Ensure slide layout rIds are consecutive by reorganizing relationships if necessary.
+        
+        PowerPoint expects slide layout relationships to use consecutive rIds 
+        (rId1, rId2, rId3...) without gaps. This method reorganizes relationships
+        to ensure this constraint is met.
+        """
+        from pptx.opc.package import _Relationship, RT
+        from pptx.opc.constants import RELATIONSHIP_TARGET_MODE as RTM
+        
+        # Get all current relationships
+        all_rels = dict(slide_master_part._rels._rels)
+        
+        # Separate layout relationships from others
+        layout_rels = {}
+        other_rels = {}
+        
+        for rId, rel in all_rels.items():
+            if 'slideLayout' in rel.reltype:
+                layout_rels[rId] = rel
+            else:
+                other_rels[rId] = rel
+        
+        # Remove our newly added layout from layout_rels since we'll reassign it
+        if assigned_rId in layout_rels:
+            del layout_rels[assigned_rId]
+        
+        # Sort existing layout relationships by rId number
+        existing_layout_rids = sorted(layout_rels.keys(), key=lambda x: int(x[3:]))
+        
+        # Determine the next consecutive rId for layouts
+        if not existing_layout_rids:
+            next_layout_rId = "rId1"
+        else:
+            last_num = int(existing_layout_rids[-1][3:])
+            next_layout_rId = f"rId{last_num + 1}"
+        
+        # If the assigned rId is already consecutive, we're good
+        if assigned_rId == next_layout_rId:
+            return assigned_rId
+        
+        # Otherwise, we need to reorganize relationships
+        # Strategy: Move non-layout relationships to higher rIds to make room
+        
+        # Find what rId we need to free up
+        target_rId = next_layout_rId
+        
+        if target_rId in other_rels:
+            # We need to move the non-layout relationship that's blocking us
+            blocking_rel = other_rels[target_rId]
+            
+            # Find the next available rId for the blocking relationship
+            max_rId_num = max([int(rId[3:]) for rId in all_rels.keys()])
+            new_rId_for_blocker = f"rId{max_rId_num + 1}"
+            
+            # Clear all relationships and rebuild them
+            slide_master_part._rels._rels.clear()
+            
+            # Re-add existing layout relationships with their original rIds
+            for rId, rel in layout_rels.items():
+                slide_master_part._rels._rels[rId] = rel
+            
+            # Add our new layout relationship with the correct consecutive rId
+            slide_master_part._rels._rels[target_rId] = _Relationship(
+                slide_master_part._rels._base_uri,
+                target_rId,
+                RT.SLIDE_LAYOUT,
+                target_mode=RTM.INTERNAL,
+                target=slide_layout_part,
+            )
+            
+            # Re-add other relationships, moving the blocker to a new rId
+            for rId, rel in other_rels.items():
+                if rId == target_rId:
+                    # This is the relationship that was blocking us - move it
+                    slide_master_part._rels._rels[new_rId_for_blocker] = _Relationship(
+                        slide_master_part._rels._base_uri,
+                        new_rId_for_blocker,
+                        rel.reltype,
+                        target_mode=rel._target_mode,
+                        target=rel._target,
+                    )
+                else:
+                    # Keep original rId for other relationships
+                    slide_master_part._rels._rels[rId] = rel
+            
+            return target_rId
+        else:
+            # The target rId is free, just reassign our relationship
+            if assigned_rId in slide_master_part._rels._rels:
+                del slide_master_part._rels._rels[assigned_rId]
+            
+            slide_master_part._rels._rels[target_rId] = _Relationship(
+                slide_master_part._rels._base_uri,
+                target_rId,
+                RT.SLIDE_LAYOUT,
+                target_mode=RTM.INTERNAL,
+                target=slide_layout_part,
+            )
+            
+            return target_rId
 
     @lazyproperty
     def slide_layout(self):
