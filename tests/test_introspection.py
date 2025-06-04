@@ -4,8 +4,9 @@ import unittest
 from pptx.introspection import IntrospectionMixin
 from pptx.dml.color import RGBColor
 from pptx.util import Emu, Inches # For testing Length formatting
-from pptx.enum.shapes import MSO_SHAPE_TYPE, MSO_AUTO_SHAPE_TYPE, PROG_ID  # For testing enum formatting
+from pptx.enum.shapes import MSO_SHAPE_TYPE, MSO_AUTO_SHAPE_TYPE, PROG_ID, PP_PLACEHOLDER  # For testing enum formatting
 from pptx.enum.dml import MSO_COLOR_TYPE, MSO_LINE_DASH_STYLE  # For testing enum formatting
+from pptx.shapes.base import BaseShape, _PlaceholderFormat  # For testing BaseShape introspection
 
 class MyObjectWithRGB(IntrospectionMixin):
     def __init__(self, rgb_color_val, length_val=None):
@@ -541,6 +542,282 @@ class TestIntrospectionMixin(unittest.TestCase):
         self.assertIn('PROG_ID.XLSX', result['properties']['prog_id'])
         # Should NOT be a dict with _object_type
         self.assertNotIsInstance(result['properties']['prog_id'], dict)
+
+    def test_base_shape_to_dict_basic_functionality(self):
+        """Test that BaseShape.to_dict() provides expected basic structure."""
+        # Create a mock shape element and parent for testing
+        class MockShapeElement:
+            def __init__(self):
+                self.shape_id = 42
+                self.shape_name = "Test Shape 1"
+                self.has_ph_elm = False
+                self.x = Emu(914400)  # 1 inch
+                self.y = Emu(914400)  # 1 inch
+                self.cx = Emu(1828800)  # 2 inches
+                self.cy = Emu(914400)  # 1 inch
+                self.rot = 0.0
+                self.hidden = False
+
+        class MockParent:
+            def __repr__(self):
+                return "<MockSlideShapes object at 0x123>"
+
+        # Create BaseShape instance
+        shape_elm = MockShapeElement()
+        parent = MockParent()
+        shape = BaseShape(shape_elm, parent)
+
+        # Test basic to_dict functionality
+        result = shape.to_dict(include_relationships=False, max_depth=1)
+
+        # Check basic structure
+        self.assertEqual(result['_object_type'], 'BaseShape')
+        self.assertIn('_identity', result)
+        self.assertIn('properties', result)
+        self.assertIn('_llm_context', result)
+
+        # Check identity information
+        identity = result['_identity']
+        self.assertEqual(identity['shape_id'], 42)
+        self.assertEqual(identity['name'], "Test Shape 1")
+        self.assertFalse(identity['is_placeholder'])
+        # BaseShape.shape_type raises NotImplementedError, so it should be None
+        self.assertNotIn('shape_type', identity)
+
+        # Check geometry properties
+        props = result['properties']
+        self.assertIn('left', props)
+        self.assertIn('top', props)
+        self.assertIn('width', props)
+        self.assertIn('height', props)
+        self.assertIn('rotation', props)
+
+        # Verify Length objects are properly formatted
+        self.assertEqual(props['left']['_object_type'], 'Emu')
+        self.assertEqual(props['left']['emu'], 914400)
+        self.assertAlmostEqual(props['left']['inches'], 1.0)
+
+        self.assertEqual(props['rotation'], 0.0)
+
+    def test_base_shape_to_dict_with_relationships(self):
+        """Test BaseShape.to_dict() with relationships included."""
+        # Create mock objects
+        class MockShapeElement:
+            def __init__(self):
+                self.shape_id = 123
+                self.shape_name = "Relationship Test"
+                self.has_ph_elm = False
+                self.x = Emu(0)
+                self.y = Emu(0)
+                self.cx = Emu(914400)
+                self.cy = Emu(914400)
+                self.rot = 45.0
+                self.hidden = False
+
+        class MockParent:
+            def __repr__(self):
+                return "<MockSlideShapes with 5 shapes>"
+
+        class MockPart:
+            def __repr__(self):
+                return "<MockSlidePart '/ppt/slides/slide1.xml'>"
+
+        # Create shape with mock part
+        shape_elm = MockShapeElement()
+        parent = MockParent()
+        shape = BaseShape(shape_elm, parent)
+
+        # Mock the part property
+        original_part = BaseShape.part
+        BaseShape.part = property(lambda self: MockPart())
+
+        try:
+            result = shape.to_dict(include_relationships=True, max_depth=1)
+
+            # Check relationships
+            self.assertIn('relationships', result)
+            rels = result['relationships']
+
+            # Parent collection should fallback to repr since MockParent doesn't have to_dict
+            self.assertIn('parent_collection', rels)
+            self.assertIsInstance(rels['parent_collection'], str)
+            self.assertIn('MockSlideShapes', rels['parent_collection'])
+
+            # Part should fallback to repr since MockPart doesn't have to_dict
+            self.assertIn('part', rels)
+            self.assertIsInstance(rels['part'], str)
+            self.assertIn('MockSlidePart', rels['part'])
+
+        finally:
+            # Restore original part property
+            BaseShape.part = original_part
+
+    def test_base_shape_placeholder_handling(self):
+        """Test BaseShape.to_dict() with placeholder shapes."""
+        # Create mock placeholder shape
+        class MockPlaceholderElement:
+            def __init__(self):
+                self.shape_id = 200
+                self.shape_name = "Title Placeholder"
+                self.has_ph_elm = True
+                self.x = Emu(914400)
+                self.y = Emu(914400)
+                self.cx = Emu(7315200)  # 8 inches
+                self.cy = Emu(1371600)  # 1.5 inches
+                self.rot = 0.0
+                self.hidden = False
+
+        class MockPlaceholderFormat:
+            def __init__(self):
+                self.idx = 0
+                self.type = PP_PLACEHOLDER.TITLE
+
+        class MockParent:
+            def __repr__(self):
+                return "<MockSlideShapes>"
+
+        # Create placeholder shape
+        shape_elm = MockPlaceholderElement()
+        parent = MockParent()
+        shape = BaseShape(shape_elm, parent)
+
+        # Mock the placeholder_format property
+        original_placeholder_format = BaseShape.placeholder_format
+        BaseShape.placeholder_format = property(lambda self: MockPlaceholderFormat())
+
+        try:
+            result = shape.to_dict(include_relationships=False, max_depth=2)
+
+            # Check placeholder identification
+            identity = result['_identity']
+            self.assertTrue(identity['is_placeholder'])
+            self.assertIn('placeholder_details', identity)
+
+            placeholder_details = identity['placeholder_details']
+            self.assertEqual(placeholder_details['idx'], 0)
+            
+            # Check that placeholder type is properly formatted as enum
+            ph_type = placeholder_details['type']
+            self.assertEqual(ph_type['_object_type'], 'PP_PLACEHOLDER_TYPE')
+            self.assertEqual(ph_type['name'], 'TITLE')
+            self.assertEqual(ph_type['value'], 1)
+
+            # Check LLM context mentions placeholder
+            context = result['_llm_context']
+            self.assertIn('placeholder', context['description'])
+
+        finally:
+            # Restore original placeholder_format property
+            BaseShape.placeholder_format = original_placeholder_format
+
+    def test_base_shape_error_handling(self):
+        """Test BaseShape.to_dict() error handling for edge cases."""
+        # Test shape that raises errors accessing placeholder_format
+        class MockErrorShapeElement:
+            def __init__(self):
+                self.shape_id = 999
+                self.shape_name = "Error Test Shape"
+                self.has_ph_elm = True  # Says it's a placeholder
+                self.x = Emu(0)
+                self.y = Emu(0)
+                self.cx = Emu(914400)
+                self.cy = Emu(914400)
+                self.rot = 0.0
+                self.hidden = False
+
+        class MockParent:
+            def __repr__(self):
+                return "<MockParent>"
+
+        shape_elm = MockErrorShapeElement()
+        parent = MockParent()
+        shape = BaseShape(shape_elm, parent)
+
+        # Mock placeholder_format to raise ValueError
+        def failing_placeholder_format(self):
+            raise ValueError("Failed to access placeholder format")
+
+        original_placeholder_format = BaseShape.placeholder_format
+        BaseShape.placeholder_format = property(failing_placeholder_format)
+
+        try:
+            result = shape.to_dict(include_relationships=False, max_depth=1)
+
+            # Should still work but with error info in placeholder_details
+            identity = result['_identity']
+            self.assertTrue(identity['is_placeholder'])
+            self.assertIn('placeholder_details', identity)
+
+            placeholder_details = identity['placeholder_details']
+            self.assertIn('error', placeholder_details)
+            self.assertIn('Failed to access placeholder format', placeholder_details['error'])
+
+        finally:
+            # Restore original placeholder_format property
+            BaseShape.placeholder_format = original_placeholder_format
+
+    def test_base_shape_llm_context_generation(self):
+        """Test BaseShape._to_dict_llm_context() generates useful descriptions."""
+        # Create mock shape
+        class MockShapeElement:
+            def __init__(self):
+                self.shape_id = 333
+                self.shape_name = "LLM Test Shape"
+                self.has_ph_elm = False
+                self.x = Emu(914400)
+                self.y = Emu(914400) 
+                self.cx = Emu(914400)
+                self.cy = Emu(914400)
+                self.rot = 15.0
+                self.hidden = False
+
+        class MockParent:
+            pass
+
+        shape = BaseShape(MockShapeElement(), MockParent())
+        result = shape.to_dict(include_relationships=False, max_depth=1)
+
+        # Check LLM context
+        context = result['_llm_context']
+        self.assertIn('description', context)
+        self.assertIn('common_operations', context)
+
+        # Description should mention the shape name and ID
+        desc = context['description']
+        self.assertIn('LLM Test Shape', desc)
+        self.assertIn('333', desc)
+
+        # Should include common operations
+        operations = context['common_operations']
+        self.assertIn('access geometry (left, top, width, height, rotation)', operations)
+        self.assertIn('modify position and size', operations)
+
+    def test_base_shape_safe_property_access(self):
+        """Test BaseShape helper methods for safe property access."""
+        # Create basic shape
+        class MockShapeElement:
+            def __init__(self):
+                self.shape_id = 444
+                self.shape_name = "Safe Access Test"
+                self.has_ph_elm = False
+                self.x = Emu(0)
+                self.y = Emu(0)
+                self.cx = Emu(914400)
+                self.cy = Emu(914400)
+                self.rot = 0.0
+                self.hidden = False
+
+        shape = BaseShape(MockShapeElement(), None)
+
+        # Test _get_shape_type_safely
+        shape_type = shape._get_shape_type_safely()
+        self.assertIsNone(shape_type)  # BaseShape raises NotImplementedError
+
+        # Test _get_placeholder_info_safely for non-placeholder
+        placeholder_info = shape._get_placeholder_info_safely(
+            include_private=False, _visited_ids=set(), max_depth=2, expand_collections=True, format_for_llm=True
+        )
+        self.assertIsNone(placeholder_info)
 
 
 if __name__ == '__main__':

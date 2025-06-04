@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, cast
 
 from pptx.action import ActionSetting
 from pptx.dml.effect import ShadowFormat
+from pptx.introspection import IntrospectionMixin
 from pptx.shared import ElementProxy
 from pptx.util import lazyproperty
 from pptx.oxml.simpletypes import XsdBoolean
@@ -19,7 +20,7 @@ if TYPE_CHECKING:
     from pptx.util import Length
 
 
-class BaseShape(object):
+class BaseShape(IntrospectionMixin):
     """Base class for shape objects.
 
     Subclasses include |Shape|, |Picture|, and |GraphicFrame|.
@@ -226,6 +227,178 @@ class BaseShape(object):
     @visible.setter
     def visible(self, value):
         self._element._nvXxPr.cNvPr.set("hidden", XsdBoolean.convert_to_xml(not value))
+
+    # -- IntrospectionMixin overrides --
+
+    def _to_dict_identity(self, _visited_ids, max_depth, expand_collections, format_for_llm, include_private):
+        """Override to include shape-specific identity information."""
+        identity = super()._to_dict_identity(
+            _visited_ids, max_depth, expand_collections, format_for_llm, include_private
+        )
+        
+        # Basic shape identification
+        identity["shape_id"] = self.shape_id
+        identity["name"] = self.name
+        identity["is_placeholder"] = self.is_placeholder
+        
+        # Shape type (with safe error handling)
+        shape_type = self._get_shape_type_safely()
+        if shape_type is not None:
+            identity["shape_type"] = self._format_property_value_for_to_dict(
+                shape_type, include_private, _visited_ids, max_depth, expand_collections, format_for_llm
+            )
+        
+        # Placeholder details (if applicable)
+        placeholder_info = self._get_placeholder_info_safely(include_private, _visited_ids, max_depth, expand_collections, format_for_llm)
+        if placeholder_info is not None:
+            identity["placeholder_details"] = placeholder_info
+            
+        return identity
+
+    def _to_dict_properties(self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm):
+        """Override to include shape geometry properties."""
+        # Get base properties (empty dict from IntrospectionMixin)
+        props = super()._to_dict_properties(include_private, _visited_ids, max_depth, expand_collections, format_for_llm)
+        
+        # Add geometry properties
+        geometry_props = {
+            "left": self.left,
+            "top": self.top, 
+            "width": self.width,
+            "height": self.height,
+            "rotation": self.rotation
+        }
+        
+        for name, value in geometry_props.items():
+            props[name] = self._format_property_value_for_to_dict(
+                value, include_private, _visited_ids, max_depth - 1, expand_collections, format_for_llm
+            )
+            
+        return props
+
+    def _to_dict_relationships(self, remaining_depth, expand_collections, _visited_ids, format_for_llm, include_private):
+        """Override to include parent collection and part relationships."""
+        rels = super()._to_dict_relationships(
+            remaining_depth, expand_collections, _visited_ids, format_for_llm, include_private
+        )
+        
+        # Parent collection (shapes collection)
+        if self._parent is not None:
+            if hasattr(self._parent, 'to_dict') and callable(getattr(self._parent, 'to_dict')):
+                try:
+                    rels["parent_collection"] = self._parent.to_dict(
+                        include_relationships=False,
+                        max_depth=0,  # Just a summary
+                        include_private=include_private,
+                        expand_collections=False,
+                        format_for_llm=format_for_llm,
+                        _visited_ids=_visited_ids
+                    )
+                except Exception:
+                    # Fallback to repr if to_dict fails
+                    rels["parent_collection"] = repr(self._parent)
+            else:
+                # Fallback to repr if no to_dict method
+                rels["parent_collection"] = repr(self._parent)
+        
+        # Part information
+        try:
+            part = self.part
+            if hasattr(part, 'to_dict') and callable(getattr(part, 'to_dict')):
+                try:
+                    rels["part"] = part.to_dict(
+                        include_relationships=False,
+                        max_depth=0,  # Just a summary
+                        include_private=include_private,
+                        expand_collections=False,
+                        format_for_llm=format_for_llm,
+                        _visited_ids=_visited_ids
+                    )
+                except Exception:
+                    # Fallback to repr if to_dict fails
+                    rels["part"] = repr(part)
+            else:
+                # Fallback to repr if no to_dict method
+                rels["part"] = repr(part)
+        except Exception:
+            # Handle case where part access might fail
+            rels["part"] = None
+            
+        return rels
+
+    def _to_dict_llm_context(self, _visited_ids, max_depth, expand_collections, format_for_llm, include_private):
+        """Override to provide shape-specific LLM context."""
+        context = super()._to_dict_llm_context(
+            _visited_ids, max_depth, expand_collections, format_for_llm, include_private
+        )
+        
+        # Build descriptive context
+        desc_parts = []
+        
+        # Shape type description
+        shape_type = self._get_shape_type_safely()
+        if shape_type is not None:
+            desc_parts.append(f"A {shape_type.name} shape")
+        else:
+            desc_parts.append("A shape")
+            
+        # Name and ID
+        desc_parts.append(f"named '{self.name}' (ID: {self.shape_id})")
+        
+        # Placeholder context
+        if self.is_placeholder:
+            placeholder_info = self._get_placeholder_info_safely(include_private, _visited_ids, max_depth, expand_collections, format_for_llm)
+            if placeholder_info and isinstance(placeholder_info, dict) and "type" in placeholder_info:
+                ph_type = placeholder_info["type"]
+                if isinstance(ph_type, dict) and "name" in ph_type:
+                    desc_parts.append(f"serving as a {ph_type['name']} placeholder")
+                else:
+                    desc_parts.append("serving as a placeholder")
+        
+        context["description"] = " ".join(desc_parts) + "."
+        
+        # Common operations
+        context["common_operations"] = [
+            "access geometry (left, top, width, height, rotation)",
+            "modify position and size", 
+            "change name",
+            "access shape type information"
+        ]
+        
+        if self.is_placeholder:
+            context["common_operations"].append("access placeholder format details")
+            
+        return context
+
+    # -- Helper methods for safe property access --
+
+    def _get_shape_type_safely(self):
+        """Get shape_type with safe error handling for BaseShape."""
+        try:
+            return self.shape_type
+        except NotImplementedError:
+            # BaseShape doesn't implement shape_type, subclasses do
+            return None
+        except Exception:
+            # Handle any other unexpected errors
+            return None
+
+    def _get_placeholder_info_safely(self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm):
+        """Get placeholder information with safe error handling."""
+        if not self.is_placeholder:
+            return None
+            
+        try:
+            ph_fmt = self.placeholder_format
+            return {
+                "idx": ph_fmt.idx,
+                "type": self._format_property_value_for_to_dict(
+                    ph_fmt.type, include_private, _visited_ids, max_depth, expand_collections, format_for_llm
+                )
+            }
+        except (ValueError, AttributeError) as e:
+            # Return error context instead of failing
+            return {"error": f"Could not access placeholder format: {str(e)}"}
 
 
 class _PlaceholderFormat(ElementProxy):
