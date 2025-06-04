@@ -125,6 +125,107 @@ class CycleB(IntrospectionMixin):
 
 class TestIntrospectionMixin(unittest.TestCase):
 
+    def test_enhanced_error_context(self):
+        """Test that the enhanced error context provides meaningful debugging information."""
+        # Create an object that will trigger errors during serialization
+        class ErrorTriggeringObj(IntrospectionMixin):
+            def __init__(self):
+                self.working_prop = "fine"
+                
+            def _to_dict_properties(self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm):
+                # Override to include a problematic property that will cause an error
+                props = super()._to_dict_properties(include_private, _visited_ids, max_depth, expand_collections, format_for_llm)
+                
+                # Simulate an error during formatting by creating a problematic value
+                class ProblematicValue:
+                    def __len__(self):
+                        raise RuntimeError("Simulated error for testing")
+                
+                # Test error context creation directly
+                try:
+                    problematic = ProblematicValue()
+                    len(problematic)  # This will raise an error
+                except RuntimeError as e:
+                    error_context = self._create_error_context("test_error", e, problematic)
+                    props["error_test"] = error_context
+                
+                return props
+        
+        obj = ErrorTriggeringObj()
+        result = obj.to_dict()
+        
+        # Verify the error context structure
+        self.assertIn("error_test", result['properties'])
+        error_info = result['properties']['error_test']
+        
+        self.assertIn("_error", error_info)
+        self.assertIn("_object_type", error_info)
+        self.assertEqual(error_info["_object_type"], "SerializationError_test_error")
+        
+        error_details = error_info["_error"]
+        self.assertEqual(error_details["type"], "test_error")
+        self.assertEqual(error_details["message"], "Simulated error for testing")
+        self.assertEqual(error_details["exception_type"], "RuntimeError")
+        self.assertIn("ProblematicValue", error_details["value_type"])
+
+    def test_simplified_property_detection(self):
+        """Test that the simplified property detection logic works correctly."""
+        class PropertyTestObj(IntrospectionMixin):
+            def __init__(self):
+                self.public_attr = "public"
+                self._private_attr = "private"
+                self.__dunder_attr = "dunder"
+            
+            @property
+            def test_property(self):
+                return "property_value"
+            
+            def test_method(self):
+                return "method_result"
+            
+            def _to_dict_properties(self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm):
+                # Test the helper methods directly
+                attrs_to_test = ['public_attr', '_private_attr', '__dunder_attr', 'test_property', 'test_method']
+                helper_results = {}
+                
+                for attr in attrs_to_test:
+                    if hasattr(self, attr):
+                        helper_results[f"{attr}_should_include"] = self._should_include_attribute(attr, include_private)
+                        helper_results[f"{attr}_is_property"] = self._is_property(attr)
+                        helper_results[f"{attr}_is_introspection"] = self._is_introspection_method(attr)
+                        if hasattr(self, attr):
+                            attr_value = getattr(self, attr)
+                            helper_results[f"{attr}_is_callable_method"] = self._is_callable_method(attr, attr_value)
+                
+                # Get normal properties too
+                normal_props = super()._to_dict_properties(include_private, _visited_ids, max_depth, expand_collections, format_for_llm)
+                normal_props.update(helper_results)
+                return normal_props
+        
+        obj = PropertyTestObj()
+        
+        # Test without private attributes
+        result = obj.to_dict(include_private=False)
+        props = result['properties']
+        
+        # Should include public attr and property
+        self.assertTrue(props.get('public_attr_should_include'))
+        self.assertTrue(props.get('test_property_should_include'))
+        
+        # Should not include private attr (unless it's a property)
+        self.assertFalse(props.get('_private_attr_should_include'))
+        
+        # Should not include dunder
+        self.assertFalse(props.get('__dunder_attr_should_include'))
+        
+        # Property detection should work
+        self.assertTrue(props.get('test_property_is_property'))
+        self.assertFalse(props.get('public_attr_is_property'))
+        
+        # Method detection should work
+        self.assertTrue(props.get('test_method_is_callable_method'))
+        self.assertFalse(props.get('test_property_is_callable_method'))
+
     def test_rgb_color_formatting(self):
         rgb = RGBColor(0x12, 0x34, 0x56)
         obj = MyObjectWithRGB(rgb_color_val=rgb)
