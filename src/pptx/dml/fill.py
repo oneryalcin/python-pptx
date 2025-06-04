@@ -242,7 +242,7 @@ class FillFormat(IntrospectionMixin):
                     expand_collections,
                     format_for_llm,
                 )
-            except TypeError:
+            except (TypeError, RuntimeError, AttributeError, ValueError):
                 props["fore_color"] = None
             props["back_color"] = None
             props["pattern"] = None
@@ -261,7 +261,7 @@ class FillFormat(IntrospectionMixin):
                     expand_collections,
                     format_for_llm,
                 )
-            except TypeError:
+            except (TypeError, RuntimeError, AttributeError, ValueError):
                 props["fore_color"] = None
             try:
                 props["back_color"] = self._format_property_value_for_to_dict(
@@ -272,7 +272,7 @@ class FillFormat(IntrospectionMixin):
                     expand_collections,
                     format_for_llm,
                 )
-            except TypeError:
+            except (TypeError, RuntimeError, AttributeError, ValueError):
                 props["back_color"] = None
             try:
                 props["pattern"] = self._format_property_value_for_to_dict(
@@ -283,7 +283,7 @@ class FillFormat(IntrospectionMixin):
                     expand_collections,
                     format_for_llm,
                 )
-            except TypeError:
+            except (TypeError, RuntimeError, AttributeError, ValueError):
                 props["pattern"] = None
             props["gradient_stops"] = None
             props["gradient_angle"] = None
@@ -310,7 +310,7 @@ class FillFormat(IntrospectionMixin):
                         f"Collection of {len(gradient_stops)} gradient stops "
                         f"(not expanded due to max_depth or expand_collections=False)"
                     )
-            except TypeError:
+            except (TypeError, RuntimeError, AttributeError, ValueError):
                 props["gradient_stops"] = None
 
             try:
@@ -404,7 +404,7 @@ class FillFormat(IntrospectionMixin):
                 )
                 color_summary = fc_dict.get("_llm_context", {}).get("summary", "color")
                 summary_parts.append(f"Solid fill with {color_summary}")
-            except (TypeError, AttributeError):
+            except (TypeError, AttributeError, RuntimeError, ValueError):
                 summary_parts.append("Solid fill (color details unavailable)")
 
         elif fill_type_val in (MSO_FILL.PATTERNED, MSO_FILL.TEXTURED):
@@ -412,7 +412,7 @@ class FillFormat(IntrospectionMixin):
             try:
                 pattern_name = self.pattern.name if self.pattern else "Default"
                 summary_parts.append(f"{fill_type_name} fill: {pattern_name}")
-            except (TypeError, AttributeError):
+            except (TypeError, AttributeError, RuntimeError, ValueError):
                 summary_parts.append(f"{fill_type_name} fill")
 
         elif fill_type_val == MSO_FILL.GRADIENT:
@@ -426,7 +426,7 @@ class FillFormat(IntrospectionMixin):
                 except (ValueError, TypeError):
                     angle_desc = " (non-linear or angle unavailable)"
                 summary_parts.append(f"{stop_count}-stop gradient{angle_desc}")
-            except (TypeError, AttributeError):
+            except (TypeError, AttributeError, RuntimeError, ValueError):
                 summary_parts.append("Gradient fill (details unavailable)")
 
         elif fill_type_val == MSO_FILL.PICTURE:
@@ -434,7 +434,7 @@ class FillFormat(IntrospectionMixin):
                 rId = self.rId
                 rId_info = f" (rId: {rId})" if rId else ""
                 summary_parts.append(f"Picture fill{rId_info}")
-            except (TypeError, AttributeError):
+            except (TypeError, AttributeError, RuntimeError, ValueError):
                 summary_parts.append("Picture fill")
 
         elif fill_type_val == MSO_FILL.BACKGROUND:

@@ -183,7 +183,13 @@ class ColorFormat(IntrospectionMixin):
         if color_type_val == MSO_COLOR_TYPE.RGB:
             try:
                 rgb_val = self.rgb
-                context["summary"] = f"Solid RGB color: #{str(rgb_val)} (R:{rgb_val[0]}, G:{rgb_val[1]}, B:{rgb_val[2]})."
+                brightness_val = self.brightness
+                brightness_desc = ""
+                if brightness_val > 0:
+                    brightness_desc = f", {brightness_val*100:.0f}% lighter"
+                elif brightness_val < 0:
+                    brightness_desc = f", {abs(brightness_val)*100:.0f}% darker"
+                context["summary"] = f"Solid RGB color: #{str(rgb_val)} (R:{rgb_val[0]}, G:{rgb_val[1]}, B:{rgb_val[2]}){brightness_desc}."
             except AttributeError:
                 context["summary"] = "RGB color (details unavailable)."
         elif color_type_val == MSO_COLOR_TYPE.SCHEME:
