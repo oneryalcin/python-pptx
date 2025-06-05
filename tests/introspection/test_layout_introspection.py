@@ -21,6 +21,14 @@ class MockLayoutPlaceholderElement:
         self.ph_type = ph_type
         self.ph_idx = ph_idx
         self.shape_id = 42  # Add missing shape_id attribute
+        self.shape_name = f"Mock Placeholder {ph_idx}"  # Fix missing shape_name
+        self.has_ph_elm = True  # Fix missing has_ph_elm for is_placeholder property
+        # Add geometric properties for BaseShape
+        self.x = 914400  # Mock left position (1 inch in EMU)
+        self.y = 685800  # Mock top position 
+        self.cx = 6858000  # Mock width
+        self.cy = 1371600  # Mock height
+        self.rot = 0  # Mock rotation (no rotation)
 
 
 class MockLayoutPlaceholderPart:
@@ -211,6 +219,14 @@ class MockLayoutPlaceholders:
 
     def __len__(self):
         return len(self.mock_placeholders)
+    
+    def __iter__(self):
+        """Fix missing __iter__ method for iteration support."""
+        return iter(self.mock_placeholders.values())
+        
+    def __getitem__(self, key):
+        """Support indexing access."""
+        return self.mock_placeholders[key]
 
 
 class MockLayoutPlaceholder:
