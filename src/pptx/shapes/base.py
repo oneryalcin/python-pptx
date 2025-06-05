@@ -405,6 +405,94 @@ class BaseShape(IntrospectionMixin):
 
         return context
 
+    # -- Tree node overrides for FEP-020 --
+
+    def _to_tree_node_identity(self):
+        """Override to provide rich shape identity for tree node representation."""
+        identity = {
+            "shape_id": self.shape_id,
+            "name": self.name,
+            "class_name": type(self).__name__,
+        }
+
+        # Add shape type if available
+        shape_type = self._get_shape_type_safely()
+        if shape_type is not None:
+            identity["shape_type"] = shape_type.name
+
+        # Add placeholder information if applicable
+        if self.is_placeholder:
+            try:
+                placeholder_format = self.placeholder_format
+                identity["placeholder_type"] = placeholder_format.type.name
+                identity["placeholder_idx"] = placeholder_format.idx
+            except (ValueError, AttributeError):
+                identity["placeholder_type"] = "UNKNOWN"
+
+        return identity
+
+    def _to_tree_node_geometry(self):
+        """Override to provide shape geometry for tree node representation."""
+        try:
+            return {
+                "left": f"{self.left.inches:.2f} in",
+                "top": f"{self.top.inches:.2f} in",
+                "width": f"{self.width.inches:.2f} in",
+                "height": f"{self.height.inches:.2f} in",
+                "rotation": f"{self.rotation:.1f}°" if self.rotation != 0 else "0°",
+            }
+        except Exception:
+            # Fallback if geometry access fails
+            return None
+
+    def _to_tree_node_content_summary(self):
+        """Override to provide shape content summary for tree node representation."""
+        # Build summary parts
+        summary_parts = []
+
+        # Shape type and name
+        shape_type = self._get_shape_type_safely()
+        if shape_type:
+            summary_parts.append(f"{shape_type.name}")
+        else:
+            summary_parts.append("Shape")
+
+        # Add name if different from default pattern
+        if self.name and not self.name.startswith((type(self).__name__, "Shape")):
+            summary_parts.append(f"'{self.name}'")
+
+        # Placeholder context
+        if self.is_placeholder:
+            try:
+                placeholder_format = self.placeholder_format
+                ph_type = placeholder_format.type.name
+                summary_parts.append(f"({ph_type} placeholder)")
+            except (ValueError, AttributeError):
+                summary_parts.append("(placeholder)")
+
+        # Text content hint for shapes with text frames
+        if hasattr(self, 'has_text_frame') and self.has_text_frame:
+            try:
+                if hasattr(self, 'text_frame') and hasattr(self, 'text'):
+                    text_content = self.text.strip()  # type: ignore
+                    if text_content:
+                        # Truncate long text
+                        if len(text_content) > 30:
+                            text_content = text_content[:27] + "..."
+                        summary_parts.append(f"Text: '{text_content}'")
+                    else:
+                        summary_parts.append("(empty text)")
+            except Exception:
+                summary_parts.append("(text frame)")
+
+        # Chart/table context
+        if hasattr(self, 'has_chart') and self.has_chart:
+            summary_parts.append("(contains chart)")
+        elif hasattr(self, 'has_table') and self.has_table:
+            summary_parts.append("(contains table)")
+
+        return " ".join(summary_parts)
+
     # -- Helper methods for safe property access --
 
     def _get_shape_type_safely(self):

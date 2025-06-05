@@ -1009,3 +1009,190 @@ class MockPicture(IntrospectionMixin):
             "summary": summary,
             "common_operations": common_operations
         }
+
+
+# =============================================================================
+# Tree Functionality Mock Classes for FEP-020
+# =============================================================================
+
+def create_mock_length(inches=1.0):
+    """Create a mock Length object for testing."""
+    from unittest.mock import Mock
+    length = Mock()
+    length.inches = inches
+    length.pt = inches * 72
+    length.cm = inches * 2.54
+    length.mm = inches * 25.4
+    length.emu = int(inches * 914400)
+    return length
+
+
+class MockShape(IntrospectionMixin):
+    """Mock shape for tree functionality testing."""
+    
+    def __init__(self, shape_id=42, name="Test Shape", has_text_frame=False):
+        super().__init__()
+        self.shape_id = shape_id
+        self.name = name
+        self.has_text_frame = has_text_frame
+        self.is_placeholder = False
+        
+        # Geometry properties
+        self.left = create_mock_length(1.0)
+        self.top = create_mock_length(2.0)
+        self.width = create_mock_length(3.0)
+        self.height = create_mock_length(1.5)
+        self.rotation = 0.0
+        
+        # Text content for testing
+        self.text = "Sample text content" if has_text_frame else ""
+        
+        # Mock parent and part
+        from unittest.mock import Mock
+        self._parent = Mock()
+        
+    def _get_shape_type_safely(self):
+        """Mock shape type access."""
+        from unittest.mock import Mock
+        shape_type = Mock()
+        shape_type.name = "RECTANGLE"
+        return shape_type
+        
+    @property
+    def part(self):
+        from unittest.mock import Mock
+        return Mock()
+
+
+class MockPlaceholderFormat(IntrospectionMixin):
+    """Mock placeholder format for testing."""
+    
+    def __init__(self, placeholder_type=PP_PLACEHOLDER.TITLE, idx=0):
+        super().__init__()
+        self.type = placeholder_type
+        self.idx = idx
+        
+    def to_dict(self, **kwargs):
+        """Mock to_dict implementation."""
+        return {
+            "_object_type": "_PlaceholderFormat",
+            "properties": {
+                "type": {
+                    "_object_type": "PP_PLACEHOLDER_TYPE",
+                    "name": self.type.name,
+                    "value": int(self.type),
+                    "description": ""
+                },
+                "idx": self.idx
+            }
+        }
+
+
+class MockGroupShape(MockShape):
+    """Mock group shape for tree functionality testing."""
+    
+    def __init__(self, shape_id=99, name="Test Group"):
+        super().__init__(shape_id, name)
+        self.shapes = [MockShape(1, "Child 1"), MockShape(2, "Child 2")]
+        
+    def _get_shape_type_safely(self):
+        """Mock group shape type."""
+        from unittest.mock import Mock
+        shape_type = Mock()
+        shape_type.name = "GROUP"
+        return shape_type
+
+
+class MockSlide(IntrospectionMixin):
+    """Mock slide for tree functionality testing."""
+    
+    def __init__(self, slide_id=256, name="Test Slide"):
+        super().__init__()
+        self.slide_id = slide_id
+        self.name = name
+        self.has_notes_slide = False
+        self.follow_master_background = True
+        
+        # Mock shapes collection
+        self.shapes = [
+            MockShape(1, "Title 1", has_text_frame=True),
+            MockShape(2, "Content 1"),
+            MockGroupShape(3, "Group 1")
+        ]
+        
+        # Mock placeholders collection
+        self.placeholders = {
+            0: MockShape(1, "Title 1", has_text_frame=True),
+            1: MockShape(2, "Content 1")
+        }
+        
+        # Mock shapes collection with title property
+        from unittest.mock import Mock
+        shapes_with_title = Mock()
+        shapes_with_title.__len__ = lambda: 3
+        shapes_with_title.__iter__ = lambda: iter(self.shapes)
+        shapes_with_title.title = self.shapes[0]  # First shape is title
+        self.shapes = shapes_with_title
+        
+        # Mock placeholders collection with len and items
+        placeholders_with_methods = Mock()
+        placeholders_with_methods.__len__ = lambda: 2
+        placeholders_with_methods.items = lambda: self.placeholders.items()
+        self.placeholders = placeholders_with_methods
+        
+        # Mock part for parent relationship
+        from unittest.mock import Mock
+        self.part = Mock()
+        
+    @property
+    def slide_layout(self):
+        """Mock slide layout."""
+        from unittest.mock import Mock
+        layout = Mock()
+        layout.name = "Title Slide"
+        return layout
+
+
+class MockPresentation(IntrospectionMixin):
+    """Mock presentation for tree functionality testing."""
+    
+    def __init__(self, title="Test Presentation"):
+        super().__init__()
+        
+        # Mock core properties
+        from unittest.mock import Mock
+        self.core_properties = Mock()
+        self.core_properties.title = title
+        
+        # Mock slide dimensions
+        self.slide_width = create_mock_length(10.0)
+        self.slide_height = create_mock_length(7.5)
+        
+        # Mock slides collection
+        self.slides = [
+            MockSlide(256, "Slide 1"),
+            MockSlide(257, "Slide 2"), 
+            MockSlide(258, "Slide 3")
+        ]
+        
+        # Mock slide masters collection
+        from unittest.mock import Mock
+        self.slide_masters = [Mock()]
+        
+        # Mock notes master
+        self.notes_master = Mock()
+        
+        # Mock part
+        self.part = Mock()
+        
+        # Add len methods to collections
+        slides_with_len = Mock()
+        slides_with_len.__len__ = lambda: 3
+        slides_with_len.__iter__ = lambda: iter(self.slides)
+        slides_with_len.__getitem__ = lambda _, i: self.slides[i]
+        self.slides = slides_with_len
+        
+        masters_with_len = Mock()
+        masters_with_len.__len__ = lambda: 1
+        masters_with_len.__iter__ = lambda: iter(self.slide_masters)
+        self.slide_masters = masters_with_len

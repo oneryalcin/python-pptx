@@ -468,6 +468,149 @@ class Slide(_BaseSlide, IntrospectionMixin):
 
         return context
 
+    # -- Tree functionality for FEP-020 --
+
+    def get_tree(self, max_depth=2):
+        """Generate a hierarchical tree view of this slide and its shapes.
+
+        This method provides the "Wide-Angle" discovery view for FEP-020,
+        allowing AI agents to quickly understand the structure and contents
+        of a slide without loading full object details.
+
+        Args:
+            max_depth (int): Maximum depth for recursive tree generation.
+                Default 2. Controls how deep the tree traversal goes:
+                - 0: Just this slide node (no children)
+                - 1: Slide + immediate shapes (no shape children)
+                - 2: Slide + shapes + shape children (like grouped shapes)
+
+        Returns:
+            dict: Tree representation with structure:
+                {
+                    "_object_type": "Slide",
+                    "_identity": {"slide_id": 256, "name": "...", ...},
+                    "access_path": "slides[0]",
+                    "geometry": None,
+                    "content_summary": "Slide: Title Slide (5 shapes)",
+                    "children": [...] | None
+                }
+
+        Example:
+            >>> slide = presentation.slides[0]
+            >>> tree = slide.get_tree(max_depth=1)
+            >>> print(tree['content_summary'])
+            "Slide: Title Slide (5 shapes, 2 placeholders)"
+        """
+        # Determine access path for this slide
+        try:
+            # Find our index in the parent presentation's slides
+            parent_prs = self.part.package.presentation_part.presentation
+            slide_index = None
+            for i, slide in enumerate(parent_prs.slides):
+                if slide.slide_id == self.slide_id:
+                    slide_index = i
+                    break
+
+            if slide_index is not None:
+                access_path = f"slides[{slide_index}]"
+            else:
+                access_path = f"slides[slide_id_{self.slide_id}]"
+        except Exception:
+            access_path = f"slides[slide_id_{self.slide_id}]"
+
+        return self._to_tree_node(access_path, max_depth, _current_depth=0)
+
+    def _to_tree_node_identity(self):
+        """Override to provide rich slide identity for tree node representation."""
+        identity = {
+            "slide_id": self.slide_id,
+            "class_name": "Slide",
+        }
+
+        if self.name:
+            identity["name"] = self.name
+
+        # Add layout information
+        try:
+            layout = self.slide_layout
+            if layout and layout.name:
+                identity["layout_name"] = layout.name
+        except Exception:
+            pass
+
+        return identity
+
+    def _to_tree_node_geometry(self):
+        """Override - slides don't have geometry, return None."""
+        return None
+
+    def _to_tree_node_content_summary(self):
+        """Override to provide slide content summary for tree node representation."""
+        summary_parts = []
+
+        # Slide identifier
+        if self.name:
+            summary_parts.append(f"Slide: '{self.name}'")
+        else:
+            summary_parts.append(f"Slide {self.slide_id}")
+
+        # Get title if available
+        try:
+            if hasattr(self.shapes, 'title') and self.shapes.title:
+                title_text = self.shapes.title.text.strip()
+                if title_text:
+                    if len(title_text) > 30:
+                        title_text = title_text[:27] + "..."
+                    summary_parts.append(f"- {title_text}")
+        except Exception:
+            pass
+
+        # Shape and placeholder counts
+        shape_count = len(self.shapes)
+        placeholder_count = len(self.placeholders)
+
+        counts = []
+        if shape_count > 0:
+            counts.append(f"{shape_count} shape{'s' if shape_count != 1 else ''}")
+        if placeholder_count > 0:
+            counts.append(f"{placeholder_count} placeholder{'s' if placeholder_count != 1 else ''}")
+
+        if counts:
+            summary_parts.append(f"({', '.join(counts)})")
+
+        return " ".join(summary_parts)
+
+    def _to_tree_node_children(self, access_path, max_depth, current_depth):
+        """Override to provide slide's shapes as children."""
+        if current_depth >= max_depth:
+            return None
+
+        children = []
+
+        try:
+            # Add shapes
+            for i, shape in enumerate(self.shapes):
+                shape_access_path = f"{access_path}.shapes[{i}]"
+                if hasattr(shape, '_to_tree_node'):
+                    child_node = shape._to_tree_node(shape_access_path, max_depth, current_depth + 1)
+                    children.append(child_node)
+                else:
+                    # Fallback for shapes without tree node support
+                    children.append({
+                        "_object_type": type(shape).__name__,
+                        "_identity": {"class_name": type(shape).__name__},
+                        "access_path": shape_access_path,
+                        "geometry": None,
+                        "content_summary": f"{type(shape).__name__} object",
+                        "children": None
+                    })
+
+        except Exception:
+            # If we can't access shapes, return empty children list
+            pass
+
+        return children if children else None
+
 
 class Slides(ParentedElementProxy):
     """Sequence of slides belonging to an instance of |Presentation|.
@@ -948,7 +1091,7 @@ class SlideMaster(_BaseMaster, IntrospectionMixin):
                     )
                 else:
                     props["background_fill"] = {
-                        "_object_type": "FillFormat", 
+                        "_object_type": "FillFormat",
                         "_depth_exceeded": True
                     }
             except Exception as e:
