@@ -96,6 +96,7 @@ Systematic addition of introspection capabilities (`to_dict()` methods) across a
 | 012 | Slide | ✅ | Slide properties, shapes/placeholders collections, relationships |
 | 013 | Presentation | ✅ | Top-level presentation introspection, core properties, collections |
 | 014 | PlaceholderFormat | ✅ | Placeholder details (idx, type), enhanced BaseShape integration |
+| 015 | Picture & Image | ✅ | Complete picture/image introspection with crop, mask, and media details |
 
 **Test Architecture:** Refactored from 1,952-line monolith to modular structure (84% size reduction).
 
@@ -117,7 +118,6 @@ class IntrospectionMixin:
 
 ### High Priority
 - **FEP-008:** AutoShape introspection (adjustments, text frames)
-- **FEP-015:** Picture & Media introspection
 
 ### Medium Priority  
 - **FEP-016:** Table introspection
@@ -129,7 +129,7 @@ class IntrospectionMixin:
 ### Low Priority
 - **FEP-021:** Interactive Manipulation Hints
 
-**Progress:** 13/20 FEPs completed (65.0%)
+**Progress:** 14/20 FEPs completed (70.0%)
 
 ## FEP Development Workflow
 

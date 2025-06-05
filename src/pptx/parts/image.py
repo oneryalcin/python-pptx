@@ -9,6 +9,7 @@ from typing import IO, TYPE_CHECKING, Any, cast
 
 from PIL import Image as PIL_Image
 
+from pptx.introspection import IntrospectionMixin
 from pptx.opc.package import Part
 from pptx.opc.spec import image_content_types
 from pptx.util import Emu, lazyproperty
@@ -139,7 +140,7 @@ class ImagePart(Part):
         return image.size
 
 
-class Image(object):
+class Image(IntrospectionMixin):
     """Immutable value object representing an image such as a JPEG, PNG, or GIF."""
 
     def __init__(self, blob: bytes, filename: str | None):
@@ -254,6 +255,57 @@ class Image(object):
     def size(self) -> tuple[int, int]:
         """A (width, height) 2-tuple specifying the dimensions of this image in pixels."""
         return self._pil_props[1]
+
+    def _to_dict_identity(self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm):
+        """Provide identity information for Image introspection."""
+        identity = super()._to_dict_identity(include_private, _visited_ids, max_depth, expand_collections, format_for_llm)
+        description = f"Image data: {self.filename if self.filename else 'streamed image'} ({self.ext})"
+        identity["description"] = description
+        if self.filename:
+            identity["filename"] = self.filename
+        return identity
+
+    def _to_dict_properties(self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm):
+        """Provide properties for Image introspection."""
+        props = {}
+        props["content_type"] = self.content_type
+        props["extension"] = self.ext
+        props["sha1_hash"] = self.sha1
+        props["dimensions_px"] = {"width": self.size[0], "height": self.size[1]}
+        props["dpi"] = {"horizontal": self.dpi[0], "vertical": self.dpi[1]}
+        props["blob_size_bytes"] = len(self.blob)
+        return props
+
+    def _to_dict_relationships(self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm):
+        """Provide relationships for Image introspection."""
+        return {}
+
+    def _to_dict_llm_context(self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm):
+        """Provide LLM-friendly context for Image introspection."""
+        filename_desc = f"'{self.filename}'" if self.filename else "a streamed image"
+        width, height = self.size
+        size_mb = len(self.blob) / (1024 * 1024)
+
+        description = (
+            f"An {self.ext.upper()} image {filename_desc} with dimensions {width}x{height} pixels "
+            f"at {self.dpi[0]}x{self.dpi[1]} DPI (file size: {size_mb:.2f} MB)."
+        )
+
+        summary = f"{self.ext.upper()} image: {width}x{height}px, {size_mb:.2f}MB"
+
+        common_operations = [
+            "access image binary data via .blob property",
+            "get image dimensions via .size property",
+            "check image format via .ext property",
+            "verify integrity via .sha1 hash",
+            "examine DPI settings via .dpi property"
+        ]
+
+        return {
+            "description": description,
+            "summary": summary,
+            "common_operations": common_operations
+        }
 
     @property
     def _format(self) -> str | None:
