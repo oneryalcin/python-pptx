@@ -28,7 +28,7 @@ class Presentation(PartElementProxy, IntrospectionMixin):
     part: PresentationPart  # pyright: ignore[reportIncompatibleMethodOverride]
 
     def __init__(self, element: "CT_Presentation", part: "PresentationPart"):
-        super(Presentation, self).__init__(element, part)
+        super().__init__(element, part)
         IntrospectionMixin.__init__(self)
 
     @property
