@@ -57,6 +57,7 @@ class IntrospectionMixin:
         include_private=False,
         expand_collections=True,
         format_for_llm=True,
+        fields=None,
         _visited_ids=None,
     ):
         """Serialize object state to dictionary format with comprehensive options.
@@ -72,6 +73,10 @@ class IntrospectionMixin:
                 Default True. When False, shows collection summaries only.
             format_for_llm (bool): Include LLM-friendly context and descriptions.
                 Default True. Adds '_llm_context' section for AI tools.
+            fields (list[str] | None): Dot-notation field paths to include.
+                Default None (return all fields). Use for precision querying, e.g.,
+                ['_identity.shape_id', 'properties.fill.type']. Supports trailing
+                wildcard '*' for all immediate properties under a path.
             _visited_ids (set): Internal parameter for circular reference detection.
                 Do not set manually.
 
@@ -94,13 +99,21 @@ class IntrospectionMixin:
                 >>> obj.to_dict(max_depth=1, include_relationships=False)
                 {'_object_type': 'MyClass', 'properties': {...}}
 
+            Precision field selection:
+                >>> obj.to_dict(fields=['_identity.shape_id', 'properties.fill.type'])
+                {'_identity': {'shape_id': 5}, 'properties': {'fill': {'type': {...}}}}
+
+            Wildcard field selection:
+                >>> obj.to_dict(fields=['properties.fill.*'])
+                {'properties': {'fill': {'type': ..., 'fore_color': ..., ...}}}
+
             Include private attributes:
                 >>> obj.to_dict(include_private=True)
                 {'properties': {'_internal_state': ..., 'public_attr': ...}}
 
             Collection summaries only:
                 >>> obj.to_dict(expand_collections=False)
-                {'properties': {'items': 'Collection of 5 items (not expanded)'}}
+                {'properties': {'items': {'_collection_summary': {'count': 5}}}}
         """
 
         if _visited_ids is None:
@@ -116,27 +129,219 @@ class IntrospectionMixin:
         _visited_ids.add(obj_id)
 
         try:
-            result = {
-                "_object_type": type(self).__name__,
-                "_identity": self._to_dict_identity(
-                    _visited_ids, max_depth, expand_collections, format_for_llm, include_private
-                ),
-                "properties": self._to_dict_properties(
-                    include_private, _visited_ids, max_depth, expand_collections, format_for_llm
-                ),
-            }
-
-            if format_for_llm:
-                result["_llm_context"] = self._to_dict_llm_context(
-                    _visited_ids, max_depth, expand_collections, format_for_llm, include_private
+            # FEP-019: Use field selection if fields parameter is provided
+            if fields is not None:
+                field_tree = self._parse_field_paths(fields)
+                result = self._build_sparse_dict(
+                    field_tree,
+                    include_relationships,
+                    max_depth,
+                    include_private,
+                    expand_collections,
+                    format_for_llm,
+                    _visited_ids,
                 )
-
-            if include_relationships:
-                result["relationships"] = self._to_dict_relationships(
-                    max_depth - 1, expand_collections, _visited_ids, format_for_llm, include_private
+            else:
+                # Original behavior: return full dictionary
+                result = self._build_full_dict(
+                    include_relationships,
+                    max_depth,
+                    include_private,
+                    expand_collections,
+                    format_for_llm,
+                    _visited_ids,
                 )
         finally:
             _visited_ids.remove(obj_id)
+
+        return result
+
+    def _parse_field_paths(self, fields):
+        """Parse dot-notation field paths into a nested dictionary tree.
+
+        Args:
+            fields (list[str]): List of dot-notation paths like ['_identity.shape_id']
+
+        Returns:
+            dict: Nested dictionary tree where True indicates a terminal node and
+                  {'*': True} indicates a wildcard request
+        Example:
+            Input: ['_identity.shape_id', 'properties.fill.type', 'properties.line.*']
+            Output: {
+                '_identity': {'shape_id': True},
+                'properties': {
+                    'fill': {'type': True},
+                    'line': {'*': True}
+                }
+            }
+        """
+        field_tree = {}
+
+        for field_path in fields:
+            parts = field_path.split('.')
+            current_level = field_tree
+
+            for i, part in enumerate(parts):
+                if i == len(parts) - 1:  # Last part
+                    if part == '*':
+                        current_level['*'] = True
+                    else:
+                        current_level[part] = True
+                else:  # Intermediate part
+                    if part not in current_level:
+                        current_level[part] = {}
+                    current_level = current_level[part]
+
+        return field_tree
+
+    def _build_sparse_dict(
+        self,
+        field_tree,
+        include_relationships,
+        max_depth,
+        include_private,
+        expand_collections,
+        format_for_llm,
+        _visited_ids,
+    ):
+        """Build a sparse dictionary containing only the requested fields.
+
+        Args:
+            field_tree (dict): Parsed field tree from _parse_field_paths()
+            Other args: Standard to_dict parameters
+
+        Returns:
+            dict: Sparse dictionary with only requested fields
+        """
+        result = {}
+
+        # Always include _object_type for context
+        result["_object_type"] = type(self).__name__
+
+        # Process each requested top-level section
+        for key, sub_tree in field_tree.items():
+            if key == "_identity":
+                full_identity = self._to_dict_identity(
+                    _visited_ids, max_depth, expand_collections, format_for_llm, include_private
+                )
+                result["_identity"] = self._filter_dict_by_tree(full_identity, sub_tree)
+
+            elif key == "properties":
+                result["properties"] = self._to_dict_properties_selective(
+                    sub_tree,
+                    include_private,
+                    _visited_ids,
+                    max_depth,
+                    expand_collections,
+                    format_for_llm,
+                )
+
+            elif key == "relationships" and include_relationships:
+                full_relationships = self._to_dict_relationships(
+                    max_depth - 1, expand_collections, _visited_ids, format_for_llm, include_private
+                )
+                result["relationships"] = self._filter_dict_by_tree(full_relationships, sub_tree)
+
+            elif key == "_llm_context" and format_for_llm:
+                full_context = self._to_dict_llm_context(
+                    _visited_ids, max_depth, expand_collections, format_for_llm, include_private
+                )
+                result["_llm_context"] = self._filter_dict_by_tree(full_context, sub_tree)
+
+        return result
+
+    def _filter_dict_by_tree(self, full_dict, tree):
+        """Filter a dictionary based on a field tree structure.
+
+        Args:
+            full_dict (dict): Complete dictionary to filter
+            tree (dict | True): Field tree structure or True for complete inclusion
+
+        Returns:
+            dict: Filtered dictionary containing only requested fields
+        """
+        if tree is True:
+            return full_dict
+
+        if isinstance(tree, dict) and '*' in tree:
+            # Wildcard: return all immediate properties
+            return full_dict
+
+        if not isinstance(tree, dict):
+            return full_dict
+
+        filtered = {}
+        for key, sub_tree in tree.items():
+            if key in full_dict:
+                if sub_tree is True:
+                    filtered[key] = full_dict[key]
+                else:
+                    # Recursive filtering for nested dictionaries
+                    if isinstance(full_dict[key], dict):
+                        filtered[key] = self._filter_dict_by_tree(full_dict[key], sub_tree)
+                    else:
+                        filtered[key] = full_dict[key]
+
+        return filtered
+
+    def _to_dict_properties_selective(
+        self,
+        field_tree,
+        include_private,
+        _visited_ids,
+        max_depth,
+        expand_collections,
+        format_for_llm,
+    ):
+        """Get properties selectively based on field tree.
+
+        Default implementation delegates to the regular _to_dict_properties method
+        and then filters the result. Subclasses can override this for optimization.
+        """
+        if '*' in field_tree:
+            # Wildcard: get all properties
+            return self._to_dict_properties(
+                include_private, _visited_ids, max_depth, expand_collections, format_for_llm
+            )
+        else:
+            # Get all properties and filter
+            full_properties = self._to_dict_properties(
+                include_private, _visited_ids, max_depth, expand_collections, format_for_llm
+            )
+            return self._filter_dict_by_tree(full_properties, field_tree)
+
+    def _build_full_dict(
+        self,
+        include_relationships,
+        max_depth,
+        include_private,
+        expand_collections,
+        format_for_llm,
+        _visited_ids,
+    ):
+        """Build the complete dictionary using original logic.
+
+        This encapsulates the original to_dict() behavior for when fields=None.
+        """
+        result = {
+            "_object_type": type(self).__name__,
+            "_identity": self._to_dict_identity(
+                _visited_ids, max_depth, expand_collections, format_for_llm, include_private
+            ),
+            "properties": self._to_dict_properties(
+                include_private, _visited_ids, max_depth, expand_collections, format_for_llm
+            ),
+        }
+
+        if format_for_llm:
+            result["_llm_context"] = self._to_dict_llm_context(
+                _visited_ids, max_depth, expand_collections, format_for_llm, include_private
+            )
+
+        if include_relationships:
+            result["relationships"] = self._to_dict_relationships(
+                max_depth - 1, expand_collections, _visited_ids, format_for_llm, include_private
+            )
 
         return result
 
@@ -155,7 +360,7 @@ class IntrospectionMixin:
 
         Performance Notes:
             - dir() is called once per object; consider caching for repeated calls
-            - Property detection uses multiple hasattr/getattr calls; future optimization opportunity
+            - Property detection uses multiple hasattr/getattr calls; future optimization
             - For objects with many properties, this can be expensive; consider lazy evaluation
         """
         props = {}
@@ -230,6 +435,11 @@ class IntrospectionMixin:
             "_is_property",
             "_is_introspection_method",
             "_is_callable_method",
+            "_parse_field_paths",
+            "_build_sparse_dict",
+            "_filter_dict_by_tree",
+            "_to_dict_properties_selective",
+            "_build_full_dict",
         }
         return attr_name in introspection_methods
 
@@ -327,7 +537,7 @@ class IntrospectionMixin:
                 ):
                     try:
                         return value.to_dict(
-                            include_relationships=False,  # Usually don't expand relationships of properties by default
+                            include_relationships=False,  # Don't expand relationships by default
                             max_depth=max_depth,
                             include_private=include_private,
                             expand_collections=expand_collections,
@@ -357,7 +567,21 @@ class IntrospectionMixin:
                         return self._create_error_context("collection", e, value)
                 else:
                     try:
-                        return f"Collection of {len(value)} items (not expanded due to max_depth or expand_collections=False)"
+                        # FEP-019: Return structured collection summary
+                        item_type = "object"
+                        if len(value) > 0:
+                            # Determine item type from first item
+                            first_item = value[0]
+                            if hasattr(first_item, '__class__'):
+                                item_type = first_item.__class__.__name__
+
+                        return {
+                            "_collection_summary": {
+                                "count": len(value),
+                                "item_type": item_type,
+                                "collection_type": type(value).__name__
+                            }
+                        }
                     except Exception as e:
                         return self._create_error_context("collection_summary", e, value)
 
@@ -379,7 +603,21 @@ class IntrospectionMixin:
                         return self._create_error_context("dictionary", e, value)
                 else:
                     try:
-                        return f"Dictionary with {len(value)} keys (not expanded due to max_depth or expand_collections=False)"
+                        # FEP-019: Return structured collection summary for dictionaries
+                        value_type = "object"
+                        if len(value) > 0:
+                            # Determine value type from first value
+                            first_value = next(iter(value.values()))
+                            if hasattr(first_value, '__class__'):
+                                value_type = first_value.__class__.__name__
+
+                        return {
+                            "_collection_summary": {
+                                "count": len(value),
+                                "item_type": value_type,
+                                "collection_type": "dict"
+                            }
+                        }
                     except Exception as e:
                         return self._create_error_context("dictionary_summary", e, value)
 

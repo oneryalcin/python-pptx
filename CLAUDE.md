@@ -100,6 +100,7 @@ Systematic addition of introspection capabilities (`to_dict()` methods) across a
 | 016 | SlideLayout & LayoutPlaceholder | ✅ | Layout introspection with placeholders, shapes, relationships, inheritance |
 | 017 | SlideMaster & MasterPlaceholder | ✅ | Master template introspection with placeholders, layouts, color mapping, inheritance root |
 | 018 | Table & _Cell | ✅ | Table structure, cell properties, margins, merge status, formatting flags |
+| 019 | Precision Inspection Controls | ✅ | Field selection (`fields` parameter), structured collection summaries, wildcard support |
 
 **Test Architecture:** Refactored from 1,952-line monolith to modular structure (84% size reduction).
 
@@ -123,14 +124,14 @@ class IntrospectionMixin:
 - **FEP-008:** AutoShape introspection (adjustments, text frames)
 
 ### Medium Priority  
-- **FEP-019:** Enhanced LLM Context Generation
 - **FEP-020:** Relationship Mapping & Inheritance
 - **FEP-021:** Performance Optimization
+- **FEP-022:** Enhanced LLM Context Generation
 
 ### Low Priority
-- **FEP-022:** Interactive Manipulation Hints
+- **FEP-023:** Interactive Manipulation Hints
 
-**Progress:** 17/21 FEPs completed (81.0%)
+**Progress:** 18/22 FEPs completed (81.8%)
 
 ## FEP Development Workflow
 
