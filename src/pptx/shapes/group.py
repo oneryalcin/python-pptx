@@ -131,7 +131,7 @@ class GroupShape(BaseShape):
 
     def _to_tree_node_children(self, access_path, max_depth, current_depth):
         """Override to provide group's member shapes as children."""
-        if current_depth >= max_depth:
+        if current_depth > max_depth:
             return None
 
         children = []

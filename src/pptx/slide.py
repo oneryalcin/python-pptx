@@ -582,7 +582,7 @@ class Slide(_BaseSlide, IntrospectionMixin):
 
     def _to_tree_node_children(self, access_path, max_depth, current_depth):
         """Override to provide slide's shapes as children."""
-        if current_depth >= max_depth:
+        if current_depth > max_depth:
             return None
 
         children = []

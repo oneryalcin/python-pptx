@@ -155,12 +155,13 @@ def test_presentation_tree_functionality():
         shape_children = tree["children"]
         assert len(shape_children) >= 2, f"Expected at least 2 shapes, got {len(shape_children)}"
         
-        # Test first shape (textbox)
-        textbox_tree = shape_children[0]
-        assert textbox_tree["_object_type"] in ["Shape", "BaseShape"], f"Expected Shape, got {textbox_tree['_object_type']}"
-        assert "geometry" in textbox_tree, "Shape should have geometry"
+        # Test first shape (could be textbox or placeholder)
+        first_shape_tree = shape_children[0]
+        expected_types = ["Shape", "BaseShape", "SlidePlaceholder", "LayoutPlaceholder", "MasterPlaceholder"]
+        assert first_shape_tree["_object_type"] in expected_types, f"Expected one of {expected_types}, got {first_shape_tree['_object_type']}"
+        assert "geometry" in first_shape_tree, "Shape should have geometry"
         
-        geometry = textbox_tree["geometry"]
+        geometry = first_shape_tree["geometry"]
         if geometry:
             assert "left" in geometry, "Geometry should include left"
             assert "top" in geometry, "Geometry should include top"
@@ -169,13 +170,13 @@ def test_presentation_tree_functionality():
             assert all(val.endswith(" in") for key, val in geometry.items() if key != "rotation"), "Geometry values should be in inches"
         
         # Test shape identity
-        identity = textbox_tree["_identity"]
+        identity = first_shape_tree["_identity"]
         assert "shape_id" in identity, "Shape identity should include shape_id"
         assert "name" in identity, "Shape identity should include name"
         
         print(f"  Found {len(shape_children)} shapes on slide")
         print(f"  First shape geometry: {geometry}")
-        print(f"  First shape summary: {textbox_tree['content_summary']}")
+        print(f"  First shape summary: {first_shape_tree['content_summary']}")
     
     def test_group_shape_functionality():
         """Test 5: Test group shape tree functionality."""

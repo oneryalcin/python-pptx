@@ -1062,6 +1062,82 @@ class MockShape(IntrospectionMixin):
     def part(self):
         from unittest.mock import Mock
         return Mock()
+    
+    # Tree functionality implementation matching real BaseShape
+    def _to_tree_node_identity(self):
+        """Override to provide rich shape identity for tree node representation."""
+        identity = {
+            "shape_id": self.shape_id,
+            "name": self.name,
+            "class_name": type(self).__name__,
+        }
+
+        # Add shape type if available
+        shape_type = self._get_shape_type_safely()
+        if shape_type is not None:
+            identity["shape_type"] = shape_type.name
+
+        # Add placeholder information if applicable
+        if self.is_placeholder:
+            try:
+                # Mock placeholder format 
+                identity["placeholder_type"] = "TITLE"
+                identity["placeholder_idx"] = 0
+            except (ValueError, AttributeError):
+                identity["placeholder_type"] = "UNKNOWN"
+
+        return identity
+
+    def _to_tree_node_geometry(self):
+        """Override to provide shape geometry for tree node representation."""
+        try:
+            return {
+                "left": f"{self.left.inches:.2f} in",
+                "top": f"{self.top.inches:.2f} in",
+                "width": f"{self.width.inches:.2f} in",
+                "height": f"{self.height.inches:.2f} in",
+                "rotation": f"{self.rotation:.1f}°" if self.rotation != 0 else "0°",
+            }
+        except Exception:
+            # Fallback if geometry access fails
+            return None
+
+    def _to_tree_node_content_summary(self):
+        """Override to provide shape content summary for tree node representation."""
+        # Build summary parts
+        summary_parts = []
+
+        # Shape type and name
+        shape_type = self._get_shape_type_safely()
+        if shape_type:
+            summary_parts.append(f"{shape_type.name}")
+        else:
+            summary_parts.append("Shape")
+
+        # Add name if different from default pattern
+        if self.name and not self.name.startswith((type(self).__name__, "Shape")):
+            summary_parts.append(f"'{self.name}'")
+
+        # Placeholder context
+        if self.is_placeholder:
+            summary_parts.append("(placeholder)")
+
+        # Text content hint for shapes with text frames
+        if hasattr(self, 'has_text_frame') and self.has_text_frame:
+            try:
+                if hasattr(self, 'text') and self.text:
+                    text_content = self.text.strip()
+                    if text_content:
+                        # Truncate long text
+                        if len(text_content) > 30:
+                            text_content = text_content[:27] + "..."
+                        summary_parts.append(f"Text: '{text_content}'")
+                    else:
+                        summary_parts.append("(empty text)")
+            except Exception:
+                summary_parts.append("(text frame)")
+
+        return " ".join(summary_parts)
 
 
 class MockPlaceholderFormat(IntrospectionMixin):
@@ -1101,6 +1177,69 @@ class MockGroupShape(MockShape):
         shape_type = Mock()
         shape_type.name = "GROUP"
         return shape_type
+        
+    # Tree functionality implementation matching real GroupShape
+    def get_tree(self, max_depth=2):
+        """Generate a hierarchical tree view of this group shape and its contents."""
+        access_path = f"group_shape_{self.shape_id}"
+        return self._to_tree_node(access_path, max_depth, _current_depth=0)
+
+    def _to_tree_node_content_summary(self):
+        """Override to provide group-specific content summary for tree node representation."""
+        summary_parts = []
+
+        # Group identifier
+        summary_parts.append("Group")
+
+        # Add name if it's meaningful (not default pattern)
+        if self.name and not self.name.startswith(("Group", "Grouped")):
+            summary_parts.append(f"'{self.name}'")
+
+        # Member shape count
+        try:
+            shape_count = len(self.shapes)
+            if shape_count > 0:
+                summary_parts.append(f"({shape_count} shape{'s' if shape_count != 1 else ''})")
+            else:
+                summary_parts.append("(empty)")
+        except Exception:
+            summary_parts.append("(unknown contents)")
+
+        return " ".join(summary_parts)
+
+    def _to_tree_node_children(self, access_path, max_depth, current_depth):
+        """Override to provide group's member shapes as children."""
+        if current_depth > max_depth:
+            return None
+
+        children = []
+
+        try:
+            # Add member shapes
+            for i, shape in enumerate(self.shapes):
+                shape_access_path = f"{access_path}.shapes[{i}]"
+                if hasattr(shape, '_to_tree_node'):
+                    child_node = shape._to_tree_node(shape_access_path, max_depth, current_depth + 1)
+                    children.append(child_node)
+                else:
+                    # Fallback for shapes without tree node support
+                    children.append({
+                        "_object_type": type(shape).__name__,
+                        "_identity": {
+                            "shape_id": getattr(shape, 'shape_id', 'unknown'),
+                            "class_name": type(shape).__name__
+                        },
+                        "access_path": shape_access_path,
+                        "geometry": None,
+                        "content_summary": f"{type(shape).__name__} object",
+                        "children": None
+                    })
+
+        except Exception:
+            # If we can't access shapes, return empty children list
+            pass
+
+        return children if children else None
 
 
 class MockSlide(IntrospectionMixin):
@@ -1151,6 +1290,119 @@ class MockSlide(IntrospectionMixin):
         layout = Mock()
         layout.name = "Title Slide"
         return layout
+    
+    # Tree functionality implementation matching real Slide
+    def get_tree(self, max_depth=2):
+        """Generate a hierarchical tree view of this slide and its shapes."""
+        # For mock, use a simple access path
+        access_path = f"slides[slide_id_{self.slide_id}]"
+        return self._to_tree_node(access_path, max_depth, _current_depth=0)
+
+    def _to_tree_node_identity(self):
+        """Override to provide rich slide identity for tree node representation."""
+        identity = {
+            "slide_id": self.slide_id,
+            "class_name": "Slide",
+        }
+
+        if self.name:
+            identity["name"] = self.name
+
+        # Add layout information
+        try:
+            layout = self.slide_layout
+            if layout and layout.name:
+                identity["layout_name"] = layout.name
+        except Exception:
+            pass
+
+        return identity
+
+    def _to_tree_node_geometry(self):
+        """Override - slides don't have geometry, return None."""
+        return None
+
+    def _to_tree_node_content_summary(self):
+        """Override to provide slide content summary for tree node representation."""
+        summary_parts = []
+
+        # Slide identifier
+        if self.name:
+            summary_parts.append(f"Slide: '{self.name}'")
+        else:
+            summary_parts.append(f"Slide {self.slide_id}")
+
+        # Get title if available
+        try:
+            if hasattr(self.shapes, 'title') and self.shapes.title:
+                title_text = getattr(self.shapes.title, 'text', '').strip()
+                if title_text:
+                    if len(title_text) > 30:
+                        title_text = title_text[:27] + "..."
+                    summary_parts.append(f"- {title_text}")
+        except Exception:
+            pass
+
+        # Shape and placeholder counts
+        try:
+            # Try to get the count from the original shapes if available
+            if hasattr(self.shapes, '_original_shapes'):
+                shape_count = len(self.shapes._original_shapes)
+            else:
+                shape_count = len(self.shapes)
+        except:
+            shape_count = 3  # fallback
+        
+        try:
+            # Try to get the count from the original placeholders if available
+            if hasattr(self.placeholders, '_original_placeholders'):
+                placeholder_count = len(self.placeholders._original_placeholders)
+            else:
+                placeholder_count = len(self.placeholders)
+        except:
+            placeholder_count = 2  # fallback
+
+        counts = []
+        if shape_count > 0:
+            counts.append(f"{shape_count} shape{'s' if shape_count != 1 else ''}")
+        if placeholder_count > 0:
+            counts.append(f"{placeholder_count} placeholder{'s' if placeholder_count != 1 else ''}")
+
+        if counts:
+            summary_parts.append(f"({', '.join(counts)})")
+
+        return " ".join(summary_parts)
+
+    def _to_tree_node_children(self, access_path, max_depth, current_depth):
+        """Override to provide slide's shapes as children."""
+        if current_depth > max_depth:
+            return None
+
+        children = []
+
+        try:
+            # Add shapes
+            for i, shape in enumerate(self.shapes):
+                shape_access_path = f"{access_path}.shapes[{i}]"
+                if hasattr(shape, '_to_tree_node'):
+                    child_node = shape._to_tree_node(shape_access_path, max_depth, current_depth + 1)
+                    children.append(child_node)
+                else:
+                    # Fallback for shapes without tree node support
+                    children.append({
+                        "_object_type": type(shape).__name__,
+                        "_identity": {"class_name": type(shape).__name__},
+                        "access_path": shape_access_path,
+                        "geometry": None,
+                        "content_summary": f"{type(shape).__name__} object",
+                        "children": None
+                    })
+
+        except Exception:
+            # If we can't access shapes, return empty children list
+            pass
+
+        return children if children else None
 
 
 class MockPresentation(IntrospectionMixin):
@@ -1196,3 +1448,108 @@ class MockPresentation(IntrospectionMixin):
         masters_with_len.__len__ = lambda: 1
         masters_with_len.__iter__ = lambda: iter(self.slide_masters)
         self.slide_masters = masters_with_len
+
+    # Tree functionality implementation matching real Presentation
+    def get_tree(self, max_depth=2):
+        """Generate a hierarchical tree view of this presentation and its slides."""
+        return self._to_tree_node("", max_depth, _current_depth=0)
+
+    def _to_tree_node_identity(self):
+        """Override to provide rich presentation identity for tree node representation."""
+        identity = {
+            "class_name": "Presentation",
+        }
+
+        # Add title from core properties
+        try:
+            if self.core_properties and self.core_properties.title:
+                identity["title"] = self.core_properties.title
+        except Exception:
+            pass
+
+        # Add slide and master counts
+        try:
+            identity["slide_count"] = len(self.slides)
+            identity["master_count"] = len(self.slide_masters)
+        except Exception:
+            pass
+
+        # Add slide dimensions
+        try:
+            if self.slide_width and self.slide_height:
+                identity["slide_width"] = f"{self.slide_width.inches:.2f} in"
+                identity["slide_height"] = f"{self.slide_height.inches:.2f} in"
+        except Exception:
+            pass
+
+        return identity
+
+    def _to_tree_node_geometry(self):
+        """Override - presentations don't have geometry, return None."""
+        return None
+
+    def _to_tree_node_content_summary(self):
+        """Override to provide presentation content summary for tree node representation."""
+        summary_parts = []
+
+        # Presentation title
+        title = "Untitled Presentation"
+        try:
+            if self.core_properties and self.core_properties.title:
+                title = self.core_properties.title
+        except Exception:
+            pass
+
+        summary_parts.append(f"Presentation: '{title}'")
+
+        # Slide and master counts
+        try:
+            slide_count = len(self.slides)
+            master_count = len(self.slide_masters)
+
+            counts = []
+            if slide_count > 0:
+                counts.append(f"{slide_count} slide{'s' if slide_count != 1 else ''}")
+            if master_count > 0:
+                counts.append(f"{master_count} master{'s' if master_count != 1 else ''}")
+
+            if counts:
+                summary_parts.append(f"({', '.join(counts)})")
+        except Exception:
+            pass
+
+        return " ".join(summary_parts)
+
+    def _to_tree_node_children(self, access_path, max_depth, current_depth):
+        """Override to provide presentation's slides as children."""
+        if current_depth > max_depth:
+            return None
+
+        children = []
+
+        try:
+            # Add slides
+            for i, slide in enumerate(self.slides):
+                slide_access_path = f"slides[{i}]"
+                if hasattr(slide, '_to_tree_node'):
+                    child_node = slide._to_tree_node(slide_access_path, max_depth, current_depth + 1)
+                    children.append(child_node)
+                else:
+                    # Fallback for slides without tree node support
+                    children.append({
+                        "_object_type": "Slide",
+                        "_identity": {
+                            "slide_id": getattr(slide, 'slide_id', 'unknown'),
+                            "class_name": "Slide"
+                        },
+                        "access_path": slide_access_path,
+                        "geometry": None,
+                        "content_summary": f"Slide {getattr(slide, 'slide_id', 'unknown')}",
+                        "children": None
+                    })
+
+        except Exception:
+            # If we can't access slides, return empty children list
+            pass
+
+        return children if children else None

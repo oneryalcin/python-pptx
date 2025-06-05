@@ -452,7 +452,7 @@ class Presentation(PartElementProxy, IntrospectionMixin):
 
     def _to_tree_node_children(self, access_path, max_depth, current_depth):
         """Override to provide presentation's slides as children."""
-        if current_depth >= max_depth:
+        if current_depth > max_depth:
             return None
 
         children = []
