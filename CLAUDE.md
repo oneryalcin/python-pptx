@@ -94,6 +94,7 @@ Systematic addition of introspection capabilities (`to_dict()` methods) across a
 | 010 | _Paragraph | ✅ | Text content, formatting, runs collection, spacing |
 | 011 | TextFrame | ✅ | Text container, paragraphs, margins, formatting defaults |
 | 012 | Slide | ✅ | Slide properties, shapes/placeholders collections, relationships |
+| 013 | Presentation | ✅ | Top-level presentation introspection, core properties, collections |
 
 **Test Architecture:** Refactored from 1,952-line monolith to modular structure (84% size reduction).
 
@@ -128,7 +129,7 @@ class IntrospectionMixin:
 - **FEP-019:** Placeholder Format Details
 - **FEP-020:** Interactive Manipulation Hints
 
-**Progress:** 11/19 FEPs completed (57.9%)
+**Progress:** 12/19 FEPs completed (63.2%)
 
 ## FEP Development Workflow
 
@@ -307,13 +308,14 @@ Brief description of FEP implementation and key features.
 - **Text Hierarchy Complete:** Run, paragraph, and text frame introspection with collection management
 - **Container Introspection:** TextFrame introspection with margins, formatting, and paragraph collections
 - **Slide Introspection Complete:** Comprehensive slide-level introspection with shapes/placeholders collections and relationships
+- **Presentation Introspection Complete:** Top-level presentation introspection with core properties, collections, and relationship mapping
 - **Test Modernization:** Modular architecture with shared utilities and testing best practices
 - **Zero Regressions:** All existing functionality preserved
 
 ### Next Steps
 1. **FEP-008:** AutoShape introspection
-2. **FEP-013:** Presentation introspection
-3. **FEP-014:** Picture & Media introspection
+2. **FEP-014:** Picture & Media introspection
+3. **FEP-015:** Table introspection
 
 This systematic approach enables AI tools to understand and manipulate PowerPoint objects with complete transparency and rich context.
 
