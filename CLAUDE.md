@@ -24,6 +24,9 @@ python -c "import pptx; print('Success')"
 # Development cycle
 python -m pytest tests/ && ruff check --fix src/ && ruff format src/
 
+# Linting for specific files only (PREFERRED for PRs)
+ruff check --fix src/pptx/text/text.py && ruff format src/pptx/text/text.py
+
 # Test introspection (modular approach preferred)
 python -m pytest tests/introspection/ -v
 
@@ -87,6 +90,7 @@ Systematic addition of introspection capabilities (`to_dict()` methods) across a
 | 005 | FillFormat | ✅ | All fill types (solid, gradient, pattern, picture) |
 | 006 | LineFormat | ✅ | Line styling, leverages FillFormat |
 | 007 | Font | ✅ | Typography properties with smart color integration |
+| 009 | _Run | ✅ | Text content, font, hyperlink introspection |
 
 **Test Architecture:** Refactored from 1,952-line monolith to modular structure (84% size reduction).
 
@@ -108,22 +112,22 @@ class IntrospectionMixin:
 
 ### High Priority
 - **FEP-008:** AutoShape introspection (adjustments, text frames)
-- **FEP-009:** TextFrame & Paragraph introspection
+- **FEP-010:** TextFrame & Paragraph introspection
 - **FEP-012:** Slide introspection (shape collections, properties)
 - **FEP-013:** Presentation introspection
 
 ### Medium Priority  
-- **FEP-010:** Picture & Media introspection
-- **FEP-011:** Table introspection
-- **FEP-014:** Enhanced LLM Context Generation
-- **FEP-015:** Relationship Mapping & Inheritance
+- **FEP-011:** Picture & Media introspection
+- **FEP-014:** Table introspection
+- **FEP-015:** Enhanced LLM Context Generation
+- **FEP-016:** Relationship Mapping & Inheritance
 - **FEP-017:** Performance Optimization
 
 ### Low Priority
-- **FEP-016:** Placeholder Format Details
-- **FEP-018:** Interactive Manipulation Hints
+- **FEP-018:** Placeholder Format Details
+- **FEP-019:** Interactive Manipulation Hints
 
-**Progress:** 7/18 FEPs completed (38.9%)
+**Progress:** 8/18 FEPs completed (44.4%)
 
 ## FEP Development Workflow
 
@@ -202,6 +206,7 @@ except Exception as e:
 2. **Infinite Recursion:** Always pass `max_depth - 1` to recursive calls
 3. **Memory Leaks:** Use `_visited_ids` for circular reference detection
 4. **Type Safety:** Check `isinstance()` before accessing type-specific attributes
+5. **Linting Scope:** Only run ruff on files you modified, not entire repo (`ruff check file.py` not `ruff check src/`)
 
 ## Testing Infrastructure
 
