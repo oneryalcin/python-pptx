@@ -535,7 +535,13 @@ class Font(IntrospectionMixin):
 
         # Core font properties - handle each individually for better error isolation
         font_attr_names = [
-            "name", "size", "bold", "italic", "underline", "strikethrough", "language_id"
+            "name",
+            "size",
+            "bold",
+            "italic",
+            "underline",
+            "strikethrough",
+            "language_id",
         ]
 
         for attr_name in font_attr_names:
@@ -918,11 +924,12 @@ class _Paragraph(Subshape):
         pPr.bullet = value
 
 
-class _Run(Subshape):
+class _Run(Subshape, IntrospectionMixin):
     """Text run object. Corresponds to `a:r` child element in a paragraph."""
 
     def __init__(self, r: CT_RegularTextRun, parent: ProvidesPart):
         super(_Run, self).__init__(parent)
+        IntrospectionMixin.__init__(self)
         self._r = r
 
     @property
@@ -965,3 +972,132 @@ class _Run(Subshape):
     @text.setter
     def text(self, text: str):
         self._r.text = text
+
+    def _to_dict_identity(
+        self, _visited_ids, max_depth, expand_collections, format_for_llm, include_private
+    ):
+        """Provide minimal identity information for _Run objects."""
+        identity = super()._to_dict_identity(
+            _visited_ids, max_depth, expand_collections, format_for_llm, include_private
+        )
+        text_preview = self.text[:30] + "..." if len(self.text) > 30 else self.text
+        identity["description"] = f'A text run containing: "{text_preview}"'
+        return identity
+
+    def _to_dict_properties(
+        self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm
+    ):
+        """Extract all run properties for introspection."""
+        props = {}
+
+        # Text content
+        props["text"] = self.text
+
+        # Font (recursive call to FEP-007)
+        try:
+            if max_depth > 1:
+                props["font"] = self.font.to_dict(
+                    include_relationships=False,
+                    max_depth=max_depth - 1,
+                    include_private=include_private,
+                    expand_collections=expand_collections,
+                    format_for_llm=format_for_llm,
+                    _visited_ids=_visited_ids,
+                )
+            else:
+                props["font"] = {"_object_type": "Font", "_depth_exceeded": True}
+        except Exception as e:
+            props["font"] = self._create_error_context("font", e, "font access failed")
+
+        # Hyperlink address
+        try:
+            hlink = self.hyperlink
+            props["hyperlink_address"] = hlink.address
+        except Exception as e:
+            props["hyperlink_address"] = self._create_error_context(
+                "hyperlink_address", e, "hyperlink access failed"
+            )
+
+        return props
+
+    def _to_dict_relationships(
+        self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm
+    ):
+        """Extract relationship information for hyperlinks."""
+        rels = {}
+        try:
+            hlink = self.hyperlink
+            if hlink.address is not None:
+                # Get hyperlink rId from XML element
+                hlink_click_elm = self._r.rPr.hlinkClick if self._r.rPr is not None else None
+                if (
+                    hlink_click_elm is not None
+                    and hasattr(hlink_click_elm, "rId")
+                    and hlink_click_elm.rId
+                ):
+                    rels["hyperlink"] = {
+                        "rId": hlink_click_elm.rId,
+                        "target_url": hlink.address,
+                        "is_external": True,  # Hyperlinks from runs are usually external
+                    }
+        except Exception:
+            # Silently ignore hyperlink relationship extraction errors
+            pass
+        return rels
+
+    def _to_dict_llm_context(
+        self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm
+    ):
+        """Generate AI-friendly summary of run characteristics."""
+        try:
+            text_preview = self.text[:50].replace("\n", " ").replace("\v", " ")
+            if len(self.text) > 50:
+                text_preview += "..."
+
+            font_summary = "default font"
+            try:
+                if max_depth > 0 and hasattr(self.font, "to_dict"):
+                    font_dict = self.font.to_dict(
+                        max_depth=0,
+                        format_for_llm=True,
+                        _visited_ids=_visited_ids,
+                        include_relationships=False,
+                        include_private=include_private,
+                        expand_collections=expand_collections,
+                    )
+                    if "_llm_context" in font_dict and "summary" in font_dict["_llm_context"]:
+                        font_summary = font_dict["_llm_context"]["summary"]
+                        if "Font settings are inherited." in font_summary:
+                            font_summary = "inherited font settings"
+            except Exception:
+                pass  # Use default font summary
+
+            description_parts = [f'Text run: "{text_preview}"']
+            description_parts.append(f"with {font_summary}")
+
+            # Check for hyperlink
+            try:
+                hlink = self.hyperlink
+                if hlink.address:
+                    description_parts.append(f"hyperlinked to '{hlink.address}'")
+            except Exception:
+                pass  # Ignore hyperlink errors
+
+            context = {}
+            context["description"] = " ".join(p.rstrip(".") for p in description_parts) + "."
+            # For runs, description is often a good summary
+            context["summary"] = context["description"]
+
+            context["common_operations"] = [
+                "change text content (run.text = ...)",
+                "modify font (run.font.bold = True, etc.)",
+                "add/remove hyperlink (run.hyperlink.address = ...)",
+            ]
+            return context
+
+        except Exception as e:
+            return {
+                "summary": f"Text run with {len(self.text)} characters.",
+                "description": "Text run introspection encountered an error",
+                "error": str(e),
+            }
