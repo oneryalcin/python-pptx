@@ -47,7 +47,7 @@ src/pptx/                   # Main package
 └── introspection.py        # FEP core functionality
 
 tests/                      # pytest suite (2700+ tests)
-├── introspection/          # Modular FEP tests (96 tests)
+├── introspection/          # Modular FEP tests (116+ tests)
 └── test_introspection.py   # Legacy tests (38 tests)
 
 features/                   # BDD tests (behave)
@@ -97,6 +97,7 @@ Systematic addition of introspection capabilities (`to_dict()` methods) across a
 | 013 | Presentation | ✅ | Top-level presentation introspection, core properties, collections |
 | 014 | PlaceholderFormat | ✅ | Placeholder details (idx, type), enhanced BaseShape integration |
 | 015 | Picture & Image | ✅ | Complete picture/image introspection with crop, mask, and media details |
+| 016 | SlideLayout & LayoutPlaceholder | ✅ | Layout introspection with placeholders, shapes, relationships, inheritance |
 
 **Test Architecture:** Refactored from 1,952-line monolith to modular structure (84% size reduction).
 
@@ -120,8 +121,7 @@ class IntrospectionMixin:
 - **FEP-008:** AutoShape introspection (adjustments, text frames)
 
 ### Medium Priority  
-- **FEP-016:** Table introspection
-- **FEP-017:** SlideLayout introspection
+- **FEP-017:** Table introspection
 - **FEP-018:** Enhanced LLM Context Generation
 - **FEP-019:** Relationship Mapping & Inheritance
 - **FEP-020:** Performance Optimization
@@ -129,7 +129,7 @@ class IntrospectionMixin:
 ### Low Priority
 - **FEP-021:** Interactive Manipulation Hints
 
-**Progress:** 14/20 FEPs completed (70.0%)
+**Progress:** 15/20 FEPs completed (75.0%)
 
 ## FEP Development Workflow
 
@@ -257,7 +257,16 @@ python -m pytest tests/introspection/test_color_introspection.py -v
 python -m pytest tests/test_introspection.py -k "enum" -v
 ```
 
-### 6. PR Best Practices
+### 6. Update Progress Documentation
+```bash
+# IMPORTANT: Update CLAUDE.md before creating PR
+# - Add completed FEP to the table
+# - Update progress percentage
+# - Move FEP from "Remaining" to "Completed" section
+# - Commit documentation updates with implementation
+```
+
+### 7. PR Best Practices
 
 #### Essential PR Components
 1. **Live Test Script:** Always include executable validation script for engineers
@@ -315,8 +324,8 @@ Brief description of FEP implementation and key features.
 
 ### Next Steps
 1. **FEP-008:** AutoShape introspection
-2. **FEP-015:** Picture & Media introspection
-3. **FEP-016:** Table introspection
+2. **FEP-017:** Table introspection
+3. **FEP-018:** Enhanced LLM Context Generation
 
 This systematic approach enables AI tools to understand and manipulate PowerPoint objects with complete transparency and rich context.
 
