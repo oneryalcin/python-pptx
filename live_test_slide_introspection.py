@@ -80,7 +80,7 @@ def test_basic_slide_introspection():
     print_json_snippet(result, max_lines=25)
 
     # Verify key components
-    print(f"\nVerification:")
+    print("\nVerification:")
     print(f"- Object type: {result['_object_type']}")
     print(f"- Slide ID: {result['_identity']['slide_id']}")
     print(f"- Has notes slide: {result['properties']['has_notes_slide']}")
@@ -122,7 +122,7 @@ def test_slide_with_shapes_expanded():
 
     # Verify shapes collection
     shapes_data = result["properties"]["shapes"]
-    print(f"\nShapes collection verification:")
+    print("\nShapes collection verification:")
     print(f"- Number of shapes: {len(shapes_data)}")
     for i, shape_data in enumerate(shapes_data):
         shape_name = shape_data.get("_identity", {}).get("name", "Unnamed")
@@ -160,7 +160,7 @@ def test_slide_with_placeholders_expanded():
 
     # Verify placeholders collection
     placeholders_data = result["properties"]["placeholders"]
-    print(f"\nPlaceholders collection verification:")
+    print("\nPlaceholders collection verification:")
     print(f"- Number of placeholders: {len(placeholders_data)}")
     for i, ph_data in enumerate(placeholders_data):
         if isinstance(ph_data, dict):
@@ -206,7 +206,7 @@ def test_slide_relationships():
 
     # Verify specific relationships
     rels = result.get("relationships", {})
-    print(f"\nRelationships verification:")
+    print("\nRelationships verification:")
     print(f"- Has slide layout: {'slide_layout' in rels or 'slide_layout_ref' in rels}")
     print(f"- Has notes slide: {'notes_slide' in rels or 'notes_slide_ref' in rels}")
     print(
@@ -249,7 +249,7 @@ def test_slide_llm_context():
     print_json_snippet(llm_context)
 
     # Verify LLM context components
-    print(f"\nLLM context verification:")
+    print("\nLLM context verification:")
     print(f"- Has description: {'description' in llm_context}")
     print(f"- Has summary: {'summary' in llm_context}")
     print(f"- Has common operations: {'common_operations' in llm_context}")
