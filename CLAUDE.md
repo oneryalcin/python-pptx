@@ -93,6 +93,7 @@ Systematic addition of introspection capabilities (`to_dict()` methods) across a
 | 009 | _Run | ✅ | Text content, font, hyperlink introspection |
 | 010 | _Paragraph | ✅ | Text content, formatting, runs collection, spacing |
 | 011 | TextFrame | ✅ | Text container, paragraphs, margins, formatting defaults |
+| 012 | Slide | ✅ | Slide properties, shapes/placeholders collections, relationships |
 
 **Test Architecture:** Refactored from 1,952-line monolith to modular structure (84% size reduction).
 
@@ -114,7 +115,6 @@ class IntrospectionMixin:
 
 ### High Priority
 - **FEP-008:** AutoShape introspection (adjustments, text frames)
-- **FEP-012:** Slide introspection (shape collections, properties)
 - **FEP-013:** Presentation introspection
 
 ### Medium Priority  
@@ -128,7 +128,7 @@ class IntrospectionMixin:
 - **FEP-019:** Placeholder Format Details
 - **FEP-020:** Interactive Manipulation Hints
 
-**Progress:** 10/19 FEPs completed (52.6%)
+**Progress:** 11/19 FEPs completed (57.9%)
 
 ## FEP Development Workflow
 
@@ -177,6 +177,8 @@ python -m pytest tests/introspection/test_new_component.py -v
 - **Skip When Appropriate:** Use `@unittest.skip()` with clear explanations for difficult-to-mock scenarios that are covered by live tests
 - **PropertyMock Usage:** Use `unittest.mock.PropertyMock` for read-only properties: `patch.object(type(obj), 'prop', new_callable=PropertyMock)`
 - **Live Test Validation:** Always include comprehensive live test scripts for real-world validation when unit tests are limited
+
+> NOTE: One existign core test case was failing before our FEPs so disregard it : tests/text/test_text.py::DescribeFont::it_provides_access_to_its_color
 
 ### 4. Code Patterns
 
@@ -263,7 +265,7 @@ python -m pytest tests/test_introspection.py -k "enum" -v
 4. **Staged Changes:** Only commit files directly related to your FEP
 5. **Test Evidence:** Include test pass/fail counts and any pre-existing failures
 6. **Live Test Results:** Add live test execution results as PR comments for validation
-7. **Use GitHub CLI:** Prefer `gh` commands over other methods (e.g., `gh issue view` vs WebFetch) 
+7. **Use GitHub CLI:** Prefer `gh` commands over other methods (e.g., `gh issue view` vs WebFetch) . If you need to fetch the reviews in an existing PR use the following command (just example PR # 30) : gh api repos/oneryalcin/python-pptx/pulls/30/comments
 
 #### PR Description Template
 ```markdown
@@ -304,13 +306,14 @@ Brief description of FEP implementation and key features.
 - **Typography Complete:** Font and paragraph introspection with smart relationships
 - **Text Hierarchy Complete:** Run, paragraph, and text frame introspection with collection management
 - **Container Introspection:** TextFrame introspection with margins, formatting, and paragraph collections
+- **Slide Introspection Complete:** Comprehensive slide-level introspection with shapes/placeholders collections and relationships
 - **Test Modernization:** Modular architecture with shared utilities and testing best practices
 - **Zero Regressions:** All existing functionality preserved
 
 ### Next Steps
 1. **FEP-008:** AutoShape introspection
-2. **FEP-012:** Slide introspection
-3. **FEP-013:** Presentation introspection
+2. **FEP-013:** Presentation introspection
+3. **FEP-014:** Picture & Media introspection
 
 This systematic approach enables AI tools to understand and manipulate PowerPoint objects with complete transparency and rich context.
 
