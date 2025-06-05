@@ -95,6 +95,7 @@ Systematic addition of introspection capabilities (`to_dict()` methods) across a
 | 011 | TextFrame | ✅ | Text container, paragraphs, margins, formatting defaults |
 | 012 | Slide | ✅ | Slide properties, shapes/placeholders collections, relationships |
 | 013 | Presentation | ✅ | Top-level presentation introspection, core properties, collections |
+| 014 | PlaceholderFormat | ✅ | Placeholder details (idx, type), enhanced BaseShape integration |
 
 **Test Architecture:** Refactored from 1,952-line monolith to modular structure (84% size reduction).
 
@@ -116,20 +117,19 @@ class IntrospectionMixin:
 
 ### High Priority
 - **FEP-008:** AutoShape introspection (adjustments, text frames)
-- **FEP-013:** Presentation introspection
+- **FEP-015:** Picture & Media introspection
 
 ### Medium Priority  
-- **FEP-014:** Picture & Media introspection
-- **FEP-015:** Table introspection
-- **FEP-016:** Enhanced LLM Context Generation
-- **FEP-017:** Relationship Mapping & Inheritance
-- **FEP-018:** Performance Optimization
+- **FEP-016:** Table introspection
+- **FEP-017:** SlideLayout introspection
+- **FEP-018:** Enhanced LLM Context Generation
+- **FEP-019:** Relationship Mapping & Inheritance
+- **FEP-020:** Performance Optimization
 
 ### Low Priority
-- **FEP-019:** Placeholder Format Details
-- **FEP-020:** Interactive Manipulation Hints
+- **FEP-021:** Interactive Manipulation Hints
 
-**Progress:** 12/19 FEPs completed (63.2%)
+**Progress:** 13/20 FEPs completed (65.0%)
 
 ## FEP Development Workflow
 
@@ -309,13 +309,14 @@ Brief description of FEP implementation and key features.
 - **Container Introspection:** TextFrame introspection with margins, formatting, and paragraph collections
 - **Slide Introspection Complete:** Comprehensive slide-level introspection with shapes/placeholders collections and relationships
 - **Presentation Introspection Complete:** Top-level presentation introspection with core properties, collections, and relationship mapping
+- **Placeholder Introspection Complete:** Enhanced placeholder format details with BaseShape integration for richer placeholder information
 - **Test Modernization:** Modular architecture with shared utilities and testing best practices
 - **Zero Regressions:** All existing functionality preserved
 
 ### Next Steps
 1. **FEP-008:** AutoShape introspection
-2. **FEP-014:** Picture & Media introspection
-3. **FEP-015:** Table introspection
+2. **FEP-015:** Picture & Media introspection
+3. **FEP-016:** Table introspection
 
 This systematic approach enables AI tools to understand and manipulate PowerPoint objects with complete transparency and rich context.
 

@@ -245,6 +245,34 @@ class MockPlaceholderFormat:
         self.idx = idx
         self.type = ph_type
 
+    def to_dict(self, include_relationships=True, max_depth=3, include_private=False, expand_collections=True, format_for_llm=True, _visited_ids=None):
+        """Mock to_dict method that returns structure similar to real _PlaceholderFormat.to_dict()."""
+        return {
+            "_object_type": "_PlaceholderFormat",
+            "_identity": {
+                "class_name": "_PlaceholderFormat",
+                "description": f"Details for a {self.type.name} placeholder (idx: {self.idx})."
+            },
+            "properties": {
+                "idx": self.idx,
+                "type": {
+                    "_object_type": "PP_PLACEHOLDER_TYPE",
+                    "name": self.type.name,
+                    "value": self.type.value,
+                    "xml_value": getattr(self.type, 'xml_value', self.type.value)
+                }
+            },
+            "relationships": {},
+            "_llm_context": {
+                "description": f"Placeholder attributes: Type is {self.type.name}, Index is {self.idx}.",
+                "summary": f"Placeholder attributes: Type is {self.type.name}, Index is {self.idx}.",
+                "common_operations": [
+                    "identify placeholder role (e.g., TITLE, BODY, PICTURE)",
+                    "get unique index (idx) for matching with layout/master"
+                ]
+            }
+        }
+
 
 # =============================================================================
 # Color Testing Mock Classes
@@ -667,7 +695,7 @@ def assert_error_context_structure(test_case, error_dict, expected_error_type):
 
 class MockTextCharacterProperties:
     """Mock for CT_TextCharacterProperties (a:rPr element) for Font testing."""
-    
+
     def __init__(self):
         # Font properties
         self.b = None  # bold
@@ -677,7 +705,7 @@ class MockTextCharacterProperties:
         self.sz = None  # size in centipoints
         self.lang = None  # language ID
         self.latin = None  # typeface info
-        
+
     def get_or_add_latin(self):
         """Mock for getting/adding latin typeface element."""
         if self.latin is None:
@@ -685,7 +713,7 @@ class MockTextCharacterProperties:
             self.latin = Mock()
             self.latin.typeface = None
         return self.latin
-        
+
     def _remove_latin(self):
         """Mock for removing latin typeface element."""
         self.latin = None
@@ -693,17 +721,17 @@ class MockTextCharacterProperties:
 
 class MockFontFillFormat(FillFormat):
     """Mock FillFormat specifically for Font color testing."""
-    
+
     def __init__(self, fill_type="SOLID", color_info=None):
         # Don't call super().__init__ to avoid XML dependencies
         self._fill_type = fill_type
         self._color_info = color_info or {"rgb": "#FF0000", "summary": "RGB color: #FF0000 (R:255, G:0, B:0)."}
-    
-    def to_dict(self, include_relationships=True, max_depth=3, include_private=False, 
+
+    def to_dict(self, include_relationships=True, max_depth=3, include_private=False,
                 expand_collections=True, format_for_llm=True, _visited_ids=None):
         """Return mock fill format introspection data."""
         return {
-            "_object_type": "FillFormat", 
+            "_object_type": "FillFormat",
             "properties": {"type": {"_object_type": "MSO_FILL", "name": self._fill_type}},
             "_llm_context": {"summary": self._color_info["summary"]}
         }
