@@ -245,6 +245,173 @@ class LayoutPlaceholder(_InheritsDimensions, Shape):
         slide_master = self.part.slide_master
         return slide_master.placeholders.get(base_ph_type, None)
 
+    # -- IntrospectionMixin overrides --
+
+    def _to_dict_identity(
+        self, _visited_ids, max_depth, expand_collections, format_for_llm, include_private
+    ):
+        """Override to provide layout placeholder-specific identity information."""
+        identity = super()._to_dict_identity(
+            _visited_ids, max_depth, expand_collections, format_for_llm, include_private
+        )
+        identity["description"] = "Layout placeholder on slide layout"
+
+        # Add placeholder format details for richer context
+        try:
+            pf = self.placeholder_format
+            if pf.idx is not None:
+                identity["placeholder_idx"] = pf.idx
+            if pf.type is not None:
+                identity["placeholder_type"] = self._format_property_value_for_to_dict(
+                    pf.type,
+                    include_private,
+                    _visited_ids,
+                    max_depth - 1,
+                    expand_collections,
+                    format_for_llm,
+                )
+        except Exception:
+            pass
+
+        return identity
+
+    def _to_dict_properties(
+        self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm
+    ):
+        """Override to include layout placeholder-specific properties."""
+        props = super()._to_dict_properties(
+            include_private, _visited_ids, max_depth, expand_collections, format_for_llm
+        )
+
+        # Add layout placeholder-specific properties
+        try:
+            # Inheritance information
+            props["inherits_dimensions"] = True
+
+            # Get information about the master placeholder this inherits from
+            base_placeholder = self._base_placeholder
+            if base_placeholder and max_depth > 0:
+                try:
+                    if hasattr(base_placeholder, 'to_dict'):
+                        props["master_placeholder"] = base_placeholder.to_dict(
+                            max_depth=max_depth - 1,
+                            _visited_ids=_visited_ids,
+                            include_relationships=False,
+                            expand_collections=expand_collections,
+                            format_for_llm=format_for_llm,
+                            include_private=include_private,
+                        )
+                    else:
+                        props["master_placeholder_ref"] = repr(base_placeholder)
+                except Exception:
+                    props["master_placeholder_ref"] = "Error accessing master placeholder"
+            else:
+                props["master_placeholder"] = None
+
+        except Exception as e:
+            props["_layout_placeholder_error"] = (
+                f"Error accessing layout placeholder properties: {str(e)}"
+            )
+
+        return props
+
+    def _to_dict_relationships(
+        self, remaining_depth, expand_collections, _visited_ids, format_for_llm, include_private
+    ):
+        """Override to include layout placeholder relationships."""
+        rels = super()._to_dict_relationships(
+            remaining_depth, expand_collections, _visited_ids, format_for_llm, include_private
+        )
+
+        try:
+            # Parent slide layout
+            slide_layout = self.part
+            if hasattr(slide_layout, 'to_dict') and remaining_depth > 0:
+                try:
+                    rels["parent_slide_layout"] = slide_layout.to_dict(
+                        max_depth=0,  # Summary only to avoid circular reference
+                        _visited_ids=_visited_ids,
+                        include_relationships=False,
+                        expand_collections=False,
+                        format_for_llm=format_for_llm,
+                        include_private=include_private,
+                    )
+                except Exception:
+                    rels["parent_slide_layout_ref"] = repr(slide_layout)
+            else:
+                rels["parent_slide_layout_ref"] = (
+                    repr(slide_layout) if hasattr(self, "part") else None
+                )
+
+        except Exception:
+            pass
+
+        return rels
+
+    def _to_dict_llm_context(
+        self, _visited_ids, max_depth, expand_collections, format_for_llm, include_private
+    ):
+        """Override to provide layout placeholder-specific LLM context."""
+        context = super()._to_dict_llm_context(
+            _visited_ids, max_depth, expand_collections, format_for_llm, include_private
+        )
+
+        try:
+            # Build descriptive context
+            desc_parts = []
+
+            # Placeholder type and index
+            try:
+                pf = self.placeholder_format
+                placeholder_info = "Layout placeholder"
+                if pf.idx is not None:
+                    placeholder_info += f" #{pf.idx}"
+                if pf.type is not None:
+                    placeholder_info += f" of type {pf.type}"
+                desc_parts.append(placeholder_info)
+            except Exception:
+                desc_parts.append("Layout placeholder")
+
+            # Inheritance information
+            base_placeholder = self._base_placeholder
+            if base_placeholder:
+                try:
+                    base_pf = base_placeholder.placeholder_format
+                    if base_pf.type is not None:
+                        desc_parts.append(f"inherits from master placeholder type {base_pf.type}")
+                except Exception:
+                    desc_parts.append("inherits from a master placeholder")
+            else:
+                desc_parts.append("does not inherit from any master placeholder")
+
+            # Layout context
+            try:
+                layout_name = (
+                    self.part.name
+                    if hasattr(self.part, "name") and self.part.name
+                    else "unnamed layout"
+                )
+                desc_parts.append(f"on slide layout '{layout_name}'")
+            except Exception:
+                desc_parts.append("on a slide layout")
+
+            context["description"] = ". ".join(desc_parts).capitalize() + "."
+            context["summary"] = context["description"]
+
+            context["common_operations"] = [
+                "access placeholder format (placeholder.placeholder_format)",
+                "access inherited dimensions (placeholder.left, .top, .width, .height)",
+                "access master placeholder (placeholder._base_placeholder)",
+                "access text frame if text placeholder (placeholder.text_frame)",
+                "check placeholder type (placeholder.placeholder_format.type)"
+            ]
+
+        except Exception as e:
+            context["description"] = f"Layout placeholder with introspection error: {str(e)}"
+            context["summary"] = context["description"]
+
+        return context
+
 
 class MasterPlaceholder(BasePlaceholder):
     """Placeholder shape on a slide master."""
