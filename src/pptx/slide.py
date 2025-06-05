@@ -662,7 +662,7 @@ class SlideLayout(_BaseSlide, IntrospectionMixin):
                         placeholder_entry["placeholder_idx"] = placeholder.placeholder_format.idx
                     except Exception:
                         placeholder_entry["placeholder_idx"] = None
-                    
+
                     if hasattr(placeholder, "to_dict"):
                         placeholder_entry["placeholder_data"] = placeholder.to_dict(
                             include_relationships=True,
@@ -893,7 +893,7 @@ class SlideLayouts(ParentedElementProxy):
         slide_layout.slide_master.part.drop_rel(target_sldLayoutId.rId)
 
 
-class SlideMaster(_BaseMaster):
+class SlideMaster(_BaseMaster, IntrospectionMixin):
     """Slide master object.
 
     Provides access to slide layouts. Access to placeholders, regular shapes, and slide master-level
@@ -902,10 +902,326 @@ class SlideMaster(_BaseMaster):
 
     _element: CT_SlideMaster  # pyright: ignore[reportIncompatibleVariableOverride]
 
+    def __init__(self, element, part):
+        """Initialize SlideMaster with IntrospectionMixin support."""
+        super(SlideMaster, self).__init__(element, part)
+        IntrospectionMixin.__init__(self)
+
     @lazyproperty
     def slide_layouts(self) -> SlideLayouts:
         """|SlideLayouts| object providing access to this slide-master's layouts."""
         return SlideLayouts(self._element.get_or_add_sldLayoutIdLst(), self)
+
+    def _to_dict_identity(
+        self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm
+    ):
+        """Override to include slide master-specific identity information."""
+        identity = super()._to_dict_identity(
+            include_private, _visited_ids, max_depth, expand_collections, format_for_llm
+        )
+
+        identity["description"] = f"Slide Master: '{self.name if self.name else 'Default Master'}'"
+        if self.name:
+            identity["name"] = self.name
+
+        return identity
+
+    def _to_dict_properties(
+        self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm
+    ):
+        """Override to include slide master-specific properties."""
+        # Call parent method first to get base properties
+        props = super()._to_dict_properties(
+            include_private, _visited_ids, max_depth, expand_collections, format_for_llm
+        )
+
+        try:
+            # Background Fill (recursive, uses FEP-005)
+            try:
+                if max_depth > 0:
+                    props["background_fill"] = self.background.fill.to_dict(
+                        include_private=include_private,
+                        _visited_ids=_visited_ids,
+                        max_depth=max_depth - 1,
+                        expand_collections=expand_collections,
+                        format_for_llm=format_for_llm,
+                    )
+                else:
+                    props["background_fill"] = {
+                        "_object_type": "FillFormat", 
+                        "_depth_exceeded": True
+                    }
+            except Exception as e:
+                props["background_fill"] = self._create_error_context(
+                    "background_fill", e, "accessing background fill"
+                )
+
+            # Shapes (non-placeholders) & Placeholders
+            try:
+                all_shapes = list(self.shapes)
+                non_placeholder_shapes = [s for s in all_shapes if not s.is_placeholder]
+
+                if expand_collections and max_depth > 0:
+                    props["shapes"] = []
+                    for shape in non_placeholder_shapes:
+                        try:
+                            if hasattr(shape, 'to_dict'):
+                                props["shapes"].append(shape.to_dict(
+                                    include_private=include_private,
+                                    _visited_ids=_visited_ids,
+                                    max_depth=max_depth - 1,
+                                    expand_collections=expand_collections,
+                                    format_for_llm=format_for_llm,
+                                ))
+                            else:
+                                props["shapes"].append({"_object_ref": repr(shape)})
+                        except Exception as e:
+                            props["shapes"].append(self._create_error_context(
+                                "shape", e, f"accessing shape {getattr(shape, 'shape_id', 'unknown')}"
+                            ))
+
+                    # Master placeholders accessed by iteration (not keyed like layout placeholders)
+                    props["placeholders"] = []
+                    try:
+                        for ph in self.placeholders:
+                            ph_dict = {}
+                            # Try to get the placeholder type from the placeholder itself
+                            try:
+                                if hasattr(ph, 'placeholder_format') and ph.placeholder_format:
+                                    ph_type = ph.placeholder_format.type
+                                    ph_dict["placeholder_type_key"] = self._format_property_value_for_to_dict(
+                                        ph_type, include_private, _visited_ids, max_depth,
+                                        expand_collections, format_for_llm
+                                    )
+                            except Exception:
+                                ph_dict["placeholder_type_key"] = "Unknown"
+
+                            try:
+                                if hasattr(ph, 'to_dict'):
+                                    ph_dict.update(ph.to_dict(
+                                        include_private=include_private,
+                                        _visited_ids=_visited_ids,
+                                        max_depth=max_depth - 1,
+                                        expand_collections=expand_collections,
+                                        format_for_llm=format_for_llm,
+                                    ))
+                                else:
+                                    ph_dict["_object_ref"] = repr(ph)
+                            except Exception as e:
+                                ph_dict.update(self._create_error_context(
+                                    "placeholder", e, "accessing placeholder"
+                                ))
+                            props["placeholders"].append(ph_dict)
+                    except Exception as e:
+                        props["placeholders"] = self._create_error_context(
+                            "placeholders", e, "accessing placeholders collection"
+                        )
+                else:
+                    props["shapes"] = f"Collection of {len(non_placeholder_shapes)} non-placeholder shapes"
+                    try:
+                        placeholder_count = len(self.placeholders)
+                        props["placeholders"] = f"Collection of {placeholder_count} placeholders"
+                    except Exception:
+                        props["placeholders"] = "Collection of placeholders (count unavailable)"
+
+            except Exception as e:
+                props["shapes"] = self._create_error_context("shapes", e, "accessing shapes collection")
+                props["placeholders"] = self._create_error_context("placeholders", e, "accessing placeholders collection")
+
+            # Color Map (<p:clrMap>)
+            try:
+                clrMap = self._element.clrMap
+                if clrMap is not None:
+                    props["color_map"] = {
+                        "bg1": getattr(clrMap, 'bg1', None),
+                        "tx1": getattr(clrMap, 'tx1', None),
+                        "bg2": getattr(clrMap, 'bg2', None),
+                        "tx2": getattr(clrMap, 'tx2', None),
+                        "accent1": getattr(clrMap, 'accent1', None),
+                        "accent2": getattr(clrMap, 'accent2', None),
+                        "accent3": getattr(clrMap, 'accent3', None),
+                        "accent4": getattr(clrMap, 'accent4', None),
+                        "accent5": getattr(clrMap, 'accent5', None),
+                        "accent6": getattr(clrMap, 'accent6', None),
+                        "hlink": getattr(clrMap, 'hlink', None),
+                        "folHlink": getattr(clrMap, 'folHlink', None),
+                    }
+                else:
+                    props["color_map"] = None
+            except Exception as e:
+                props["color_map"] = self._create_error_context("color_map", e, "accessing color map")
+
+            # Text Styles (<p:txStyles>) - Summary only
+            try:
+                txStyles = getattr(self._element, 'txStyles', None)
+                props["text_styles_summary"] = {
+                    "present": txStyles is not None,
+                    "_note": "Full text style introspection is deferred to a future FEP."
+                }
+                if txStyles is not None:
+                    # Add basic information about available style types
+                    style_types = []
+                    for style_type in ['titleStyle', 'bodyStyle', 'otherStyle']:
+                        if hasattr(txStyles, style_type) and getattr(txStyles, style_type) is not None:
+                            style_types.append(style_type)
+                    props["text_styles_summary"]["available_styles"] = style_types
+            except Exception as e:
+                props["text_styles_summary"] = self._create_error_context("text_styles", e, "accessing text styles")
+
+        except Exception as e:
+            props["_slide_master_properties_error"] = f"Error accessing slide master properties: {str(e)}"
+
+        return props
+
+    def _to_dict_relationships(
+        self, remaining_depth, expand_collections, _visited_ids, format_for_llm, include_private
+    ):
+        """Override to include slide master relationships."""
+        rels = {}
+
+        try:
+            # Slide Layouts Collection
+            try:
+                slide_layouts = list(self.slide_layouts)
+
+                if expand_collections and remaining_depth > 0:
+                    rels["slide_layouts"] = []
+                    for sl in slide_layouts:
+                        try:
+                            if hasattr(sl, 'to_dict'):
+                                # Use at least depth 1 to get basic structure from SlideLayout
+                                layout_depth = max(1, remaining_depth - 1)
+                                rels["slide_layouts"].append(sl.to_dict(
+                                    include_private=include_private,
+                                    _visited_ids=_visited_ids,
+                                    max_depth=layout_depth,
+                                    expand_collections=expand_collections,
+                                    format_for_llm=format_for_llm,
+                                ))
+                            else:
+                                rels["slide_layouts"].append({"_object_ref": repr(sl)})
+                        except Exception as e:
+                            rels["slide_layouts"].append(self._create_error_context(
+                                "slide_layout", e, f"accessing slide layout {getattr(sl, 'name', 'unknown')}"
+                            ))
+                else:
+                    rels["slide_layouts_summary"] = f"Manages {len(slide_layouts)} slide layout(s)"
+
+            except Exception as e:
+                rels["slide_layouts"] = self._create_error_context("slide_layouts", e, "accessing slide layouts collection")
+
+            # Theme Part (summary ref only)
+            try:
+                from pptx.opc.constants import RELATIONSHIP_TYPE as RT
+                theme_part = self.part.part_related_by(RT.THEME)
+                rels["theme_part_ref"] = {
+                    "partname": str(theme_part.partname),
+                    "_object_type": type(theme_part).__name__
+                }
+            except (KeyError, AttributeError):
+                rels["theme_part_ref"] = "No theme part explicitly linked"
+            except Exception as e:
+                rels["theme_part_ref"] = self._create_error_context("theme_part", e, "accessing theme part")
+
+            # Parent Presentation (summary ref only)
+            try:
+                if hasattr(self, 'part') and hasattr(self.part, 'presentation_part'):
+                    pres_part = self.part.presentation_part
+                    if hasattr(pres_part, 'presentation') and remaining_depth > 0:
+                        presentation = pres_part.presentation
+                        if hasattr(presentation, 'to_dict'):
+                            rels["parent_presentation"] = presentation.to_dict(
+                                max_depth=0,  # Summary only to avoid circular reference
+                                include_relationships=False,
+                                expand_collections=False,
+                                format_for_llm=format_for_llm,
+                                include_private=include_private,
+                                _visited_ids=_visited_ids,
+                            )
+                        else:
+                            rels["parent_presentation_ref"] = repr(presentation)
+                    else:
+                        rels["parent_presentation_ref"] = "Presentation reference unavailable"
+                else:
+                    rels["parent_presentation"] = None
+            except Exception as e:
+                rels["parent_presentation"] = self._create_error_context("parent_presentation", e, "accessing parent presentation")
+
+        except Exception as e:
+            rels["_slide_master_relationships_error"] = f"Error accessing slide master relationships: {str(e)}"
+
+        return rels
+
+    def _to_dict_llm_context(
+        self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm
+    ):
+        """Override to provide slide master-specific LLM context."""
+        context = {}
+
+        try:
+            # Build description
+            master_name = self.name if self.name else "Default Master"
+
+            # Get layout count
+            layout_count = 0
+            try:
+                layout_count = len(self.slide_layouts)
+            except Exception:
+                pass
+
+            # Get placeholder count
+            placeholder_count = 0
+            try:
+                placeholder_count = len(self.placeholders)
+            except Exception:
+                pass
+
+            # Get shape count
+            shape_count = 0
+            try:
+                all_shapes = list(self.shapes)
+                shape_count = len([s for s in all_shapes if not s.is_placeholder])
+            except Exception:
+                pass
+
+            context["description"] = (
+                f"Slide Master '{master_name}' defines the foundational design template "
+                f"for {layout_count} slide layout(s). Contains {placeholder_count} default "
+                f"placeholders and {shape_count} non-placeholder shapes."
+            )
+
+            context["role"] = "Foundation of the slide design inheritance hierarchy"
+            context["design_impact"] = (
+                "All slide layouts and slides inherit design elements, placeholder properties, "
+                "and theme settings from this master. Changes here affect the entire presentation's visual consistency."
+            )
+
+            context["key_features"] = [
+                f"Manages {layout_count} slide layouts",
+                f"Provides {placeholder_count} placeholder templates",
+                f"Contains {shape_count} persistent background elements",
+                "Defines color mapping from theme",
+                "Establishes default text styles"
+            ]
+
+            context["common_operations"] = [
+                "Modify master placeholders to change default formatting for all slides",
+                "Add persistent background elements (logos, graphics) that appear on all slides",
+                "Configure color mapping between theme colors and slide elements",
+                "Set up default text styles for titles, body text, and other placeholder types",
+                "Create new slide layouts based on this master"
+            ]
+
+            context["inheritance_explanation"] = (
+                "This master is the root of a three-level inheritance hierarchy: "
+                "SlideMaster → SlideLayout → Slide. Properties flow down this chain, "
+                "with each level able to override inherited values."
+            )
+
+        except Exception as e:
+            context["_llm_context_error"] = f"Error generating LLM context: {str(e)}"
+
+        return context
 
 
 class SlideMasters(ParentedElementProxy):

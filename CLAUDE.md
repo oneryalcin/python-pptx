@@ -98,6 +98,7 @@ Systematic addition of introspection capabilities (`to_dict()` methods) across a
 | 014 | PlaceholderFormat | ✅ | Placeholder details (idx, type), enhanced BaseShape integration |
 | 015 | Picture & Image | ✅ | Complete picture/image introspection with crop, mask, and media details |
 | 016 | SlideLayout & LayoutPlaceholder | ✅ | Layout introspection with placeholders, shapes, relationships, inheritance |
+| 017 | SlideMaster & MasterPlaceholder | ✅ | Master template introspection with placeholders, layouts, color mapping, inheritance root |
 
 **Test Architecture:** Refactored from 1,952-line monolith to modular structure (84% size reduction).
 
@@ -121,15 +122,15 @@ class IntrospectionMixin:
 - **FEP-008:** AutoShape introspection (adjustments, text frames)
 
 ### Medium Priority  
-- **FEP-017:** Table introspection
-- **FEP-018:** Enhanced LLM Context Generation
-- **FEP-019:** Relationship Mapping & Inheritance
-- **FEP-020:** Performance Optimization
+- **FEP-018:** Table introspection  
+- **FEP-019:** Enhanced LLM Context Generation
+- **FEP-020:** Relationship Mapping & Inheritance
+- **FEP-021:** Performance Optimization
 
 ### Low Priority
-- **FEP-021:** Interactive Manipulation Hints
+- **FEP-022:** Interactive Manipulation Hints
 
-**Progress:** 15/20 FEPs completed (75.0%)
+**Progress:** 16/21 FEPs completed (76.2%)
 
 ## FEP Development Workflow
 
@@ -345,42 +346,4 @@ Testable: Each FEP must include corresponding unit tests.
 Non-Breaking: Changes should add functionality without altering existing public APIs or behavior (unless explicitly fixing a bug).
 List of Proposed Feature Enhancement Proposals (FEPs) for Introspection:
 
-(Ordered roughly by foundational nature and increasing complexity/dependencies)
-
-FEP-001: Basic Introspection Mixin & RGBColor.to_dict()
-Goal: Introduce the core IntrospectionMixin (or similar mechanism) and implement to_dict() for a simple value object.
-FEP-002: Length.to_dict() and Enum Introspection Helper
-Goal: Provide structured dictionary output for Length objects and a utility for representing enum members.
-FEP-003: BaseShape.to_dict() - Identity & Basic Geometry
-Goal: Implement to_dict() on BaseShape to expose fundamental shape identity (ID, name, type) and geometry (left, top, width, height, rotation).
-FEP-004: ColorFormat.to_dict()
-Goal: Provide detailed dictionary output for ColorFormat objects, showing type, RGB, theme color, and brightness.
-FEP-005: FillFormat.to_dict()
-Goal: Implement to_dict() for FillFormat, showing fill type and recursively calling to_dict() for relevant color/gradient/pattern details.
-FEP-006: LineFormat.to_dict()
-Goal: Implement to_dict() for LineFormat, showing line fill (color), width, and dash style.
-FEP-007: Font.to_dict() (Core Attributes)
-Goal: Implement to_dict() for Font, exposing name, size, bold, italic, underline, and color (recursively).
-FEP-008: Shape.to_dict() (AutoShape Specifics)
-Goal: Extend BaseShape.to_dict() for Shape (AutoShapes) to include auto_shape_type, adjustments, and a summary of text_frame (if present, recursive call).
-FEP-009: _Run.to_dict()
-Goal: Implement to_dict() for _Run, showing text content and its font.to_dict().
-FEP-010: _Paragraph.to_dict()
-Goal: Implement to_dict() for _Paragraph, showing its runs (collection, recursive), alignment, level, and spacing properties.
-FEP-011: TextFrame.to_dict()
-Goal: Implement to_dict() for TextFrame, showing its paragraphs (collection, recursive), margins, vertical anchor, word wrap, and auto-size settings.
-FEP-012: Slide.to_dict() (Basic Info & Shapes Summary)
-Goal: Implement to_dict() for Slide, showing slide_id, name, a reference to its slide_layout (summarized), and a list of its shapes (summarized identities initially).
-FEP-013: Presentation.to_dict() (Basic Info & Slides Summary)
-Goal: Implement to_dict() for Presentation, showing core properties (summarized), slide dimensions, and a list of its slides (summarized identities).
-FEP-014: Enhancing Collection Expansion in to_dict()
-Goal: Refine how collections (slides, shapes, paragraphs, runs) are expanded based on max_depth and expand_collections parameters.
-FEP-015: PlaceholderFormat.to_dict() and Shape.to_dict() Placeholder Details
-Goal: Add detailed placeholder information (idx, type) to Shape.to_dict() when is_placeholder is true.
-FEP-016: Relationship Extraction in to_dict() (Basic Parent/Child)
-Goal: Implement basic _extract_relationships for key objects like Slide, Shape to show their immediate container and direct children.
-FEP-017: Inheritance Tracing for Key Properties (e.g., Font, Position)
-Goal: Add the "source" of a property (direct, layout, master, theme) to the to_dict() output for critical properties. This is more advanced.
-FEP-018: _generate_llm_context() for Key Objects
-Goal: Start implementing natural language descriptions and common operations for Slide and Shape.
-This list is a roadmap. The order can be adjusted, and some FEPs might be combined or further broken down. The key is to make each PR a logical, testable unit.
+For more details please look at FEPS.md file

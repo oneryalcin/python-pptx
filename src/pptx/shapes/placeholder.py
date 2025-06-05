@@ -418,6 +418,159 @@ class MasterPlaceholder(BasePlaceholder):
 
     element: CT_Shape  # pyright: ignore[reportIncompatibleMethodOverride]
 
+    def _to_dict_identity(
+        self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm
+    ):
+        """Override to include master placeholder-specific identity information."""
+        identity = super()._to_dict_identity(
+            include_private, _visited_ids, max_depth, expand_collections, format_for_llm
+        )
+
+        identity["description"] = "Master Placeholder - template for layout placeholders"
+
+        # Add placeholder type to identity for clarity
+        try:
+            if self.placeholder_format and self.placeholder_format.type:
+                identity["placeholder_type"] = self._format_property_value_for_to_dict(
+                    self.placeholder_format.type,
+                    include_private, _visited_ids, max_depth, expand_collections, format_for_llm
+                )
+        except Exception:
+            pass  # Placeholder type access may fail, that's ok for identity
+
+        return identity
+
+    def _to_dict_properties(
+        self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm
+    ):
+        """Override to include master placeholder-specific properties."""
+        props = super()._to_dict_properties(
+            include_private, _visited_ids, max_depth, expand_collections, format_for_llm
+        )
+
+        try:
+            # Master placeholders are the root of the inheritance chain
+            props["is_master_placeholder"] = True
+            props["inheritance_role"] = "Template for layout and slide placeholders"
+
+            # Get basic placeholder format properties safely
+            placeholder_format = self._get_property_safely("placeholder_format")
+            if placeholder_format:
+                try:
+                    props["placeholder_idx"] = self._format_property_value_for_to_dict(
+                        placeholder_format.idx,
+                        include_private, _visited_ids, max_depth, expand_collections, format_for_llm
+                    )
+                    props["placeholder_type"] = self._format_property_value_for_to_dict(
+                        placeholder_format.type,
+                        include_private, _visited_ids, max_depth, expand_collections, format_for_llm
+                    )
+                except Exception:
+                    pass  # Some placeholder format properties may not be accessible
+
+        except Exception as e:
+            props["_master_placeholder_error"] = (
+                f"Error accessing master placeholder properties: {str(e)}"
+            )
+
+        return props
+
+    def _to_dict_relationships(
+        self, remaining_depth, expand_collections, _visited_ids, format_for_llm, include_private
+    ):
+        """Override to include master placeholder relationships."""
+        rels = super()._to_dict_relationships(
+            remaining_depth, expand_collections, _visited_ids, format_for_llm, include_private
+        )
+
+        try:
+            # Parent slide master
+            if hasattr(self, 'part'):
+                slide_master = self.part
+                if hasattr(slide_master, 'to_dict') and remaining_depth > 0:
+                    rels["parent_slide_master"] = slide_master.to_dict(
+                        max_depth=0,  # Summary only to avoid circular reference
+                        include_relationships=False,
+                        expand_collections=False,
+                        format_for_llm=format_for_llm,
+                        include_private=include_private,
+                        _visited_ids=_visited_ids,
+                    )
+                elif slide_master:
+                    rels["parent_slide_master_ref"] = repr(slide_master)
+                else:
+                    rels["parent_slide_master"] = None
+
+        except Exception as e:
+            rels["_master_placeholder_relationships_error"] = (
+                f"Error accessing master placeholder relationships: {str(e)}"
+            )
+
+        return rels
+
+    def _to_dict_llm_context(
+        self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm
+    ):
+        """Override to provide master placeholder-specific LLM context."""
+        context = super()._to_dict_llm_context(
+            include_private, _visited_ids, max_depth, expand_collections, format_for_llm
+        )
+
+        try:
+            # Build description based on placeholder type and role
+            placeholder_type = "Unknown"
+            placeholder_idx = "N/A"
+
+            try:
+                if self.placeholder_format:
+                    if hasattr(self.placeholder_format, 'type') and self.placeholder_format.type:
+                        placeholder_type = str(self.placeholder_format.type)
+                    if hasattr(self.placeholder_format, 'idx') and self.placeholder_format.idx is not None:
+                        placeholder_idx = str(self.placeholder_format.idx)
+            except Exception:
+                pass  # Placeholder format access may fail
+
+            # Get master name if available
+            master_name = "Unknown Master"
+            try:
+                if hasattr(self, 'part') and hasattr(self.part, 'name'):
+                    master_name = self.part.name or "Default Master"
+            except Exception:
+                pass
+
+            context["description"] = (
+                f"Master Placeholder of type '{placeholder_type}' (idx: {placeholder_idx}) "
+                f"on slide master '{master_name}'. This serves as the template for all layout "
+                f"and slide placeholders of the same type."
+            )
+
+            context["role"] = "Template and inheritance root for placeholder properties"
+            context["inheritance_explanation"] = (
+                "Layout placeholders inherit dimensions, formatting, and style properties from this master placeholder. "
+                "Slide placeholders then inherit from layout placeholders, creating a three-level inheritance chain."
+            )
+
+            context["common_operations"] = [
+                "Modify default formatting for all placeholders of this type",
+                "Set default dimensions that layout placeholders will inherit",
+                "Configure base text frame properties",
+                "Establish placeholder positioning standards"
+            ]
+
+        except Exception as e:
+            context["_llm_context_error"] = f"Error generating LLM context: {str(e)}"
+
+        return context
+
+    def _get_property_safely(self, property_name, method_name=None):
+        """Safely access a property, returning None if it fails."""
+        if method_name is None:
+            method_name = f"accessing {property_name}"
+        try:
+            return getattr(self, property_name)
+        except (NotImplementedError, ValueError, AttributeError):
+            return None
+
 
 class NotesSlidePlaceholder(_InheritsDimensions, Shape):
     """
