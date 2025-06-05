@@ -440,6 +440,12 @@ class IntrospectionMixin:
             "_filter_dict_by_tree",
             "_to_dict_properties_selective",
             "_build_full_dict",
+            "get_tree",
+            "_to_tree_node",
+            "_to_tree_node_identity",
+            "_to_tree_node_geometry",
+            "_to_tree_node_content_summary",
+            "_to_tree_node_children",
         }
         return attr_name in introspection_methods
 
@@ -669,3 +675,100 @@ class IntrospectionMixin:
         # EXTENSIBILITY: This method is designed to be overridden by subclasses
         # to provide rich, domain-specific context for different python-pptx objects
         return {"description": f"A {type(self).__name__} object."}
+
+    def _to_tree_node(self, access_path="", max_depth=2, _current_depth=0):
+        """Generate a tree node representation for this object.
+
+        This is the foundation method for the get_tree() functionality (FEP-020).
+        It provides a lightweight, hierarchical view of objects suitable for
+        discovery and navigation.
+
+        Args:
+            access_path (str): Programmatic path to reference this object
+                (e.g., "slides[0].shapes[1]"). Empty string for root objects.
+            max_depth (int): Maximum depth for recursive tree generation.
+                Default 2. Controls how deep the tree traversal goes.
+            _current_depth (int): Internal parameter tracking current recursion depth.
+                Do not set manually.
+
+        Returns:
+            dict: Tree node representation with structure:
+                {
+                    "_object_type": "ClassName",
+                    "_identity": {"name": "...", "id": "...", ...},
+                    "access_path": "slides[0].shapes[1]",
+                    "geometry": {"left": "1.0 in", ...} | None,
+                    "content_summary": "Brief description...",
+                    "children": [...] | None
+                }
+
+        Note:
+            This is the base implementation providing minimal node structure.
+            Subclasses should override this method to provide:
+            - Rich identity information (shape_id, placeholder_type, etc.)
+            - Geometry details (position, size) where applicable
+            - Meaningful content summaries
+            - Container-specific children expansion logic
+        """
+        node = {
+            "_object_type": type(self).__name__,
+            "_identity": self._to_tree_node_identity(),
+            "access_path": access_path,
+            "geometry": self._to_tree_node_geometry(),
+            "content_summary": self._to_tree_node_content_summary(),
+        }
+
+        # Add children if this is a container and we haven't exceeded depth
+        if _current_depth < max_depth:
+            children = self._to_tree_node_children(access_path, max_depth, _current_depth + 1)
+            if children is not None:
+                node["children"] = children
+
+        return node
+
+    def _to_tree_node_identity(self):
+        """Get identity information for tree node representation.
+
+        Returns:
+            dict: Identity dictionary with basic information.
+                Default implementation provides class name and memory address.
+                Subclasses should override to provide object-specific identifiers.
+        """
+        return {
+            "class_name": type(self).__name__,
+            "memory_address": hex(id(self)),
+        }
+
+    def _to_tree_node_geometry(self):
+        """Get geometry information for tree node representation.
+
+        Returns:
+            dict | None: Geometry dictionary with position/size information,
+                or None if object has no geometric properties.
+                Default implementation returns None.
+        """
+        return None
+
+    def _to_tree_node_content_summary(self):
+        """Get content summary for tree node representation.
+
+        Returns:
+            str: Brief, one-line description of object content.
+                Default implementation provides generic object description.
+        """
+        return f"{type(self).__name__} object"
+
+    def _to_tree_node_children(self, access_path, max_depth, current_depth):
+        """Get children for tree node representation.
+
+        Args:
+            access_path (str): Current object's access path
+            max_depth (int): Maximum depth for recursion
+            current_depth (int): Current recursion depth
+
+        Returns:
+            list | None: List of child tree nodes, or None if object is not a container.
+                Default implementation returns None (no children).
+                Container classes should override this method.
+        """
+        return None

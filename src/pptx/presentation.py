@@ -336,3 +336,150 @@ class Presentation(PartElementProxy, IntrospectionMixin):
         ]
 
         return context
+
+    # -- Tree functionality for FEP-020 --
+
+    def get_tree(self, max_depth=2):
+        """Generate a hierarchical tree view of this presentation and its slides.
+
+        This method provides the "Wide-Angle" discovery view for FEP-020,
+        allowing AI agents to quickly understand the structure and contents
+        of a presentation without loading full object details.
+
+        Args:
+            max_depth (int): Maximum depth for recursive tree generation.
+                Default 2. Controls how deep the tree traversal goes:
+                - 0: Just this presentation node (no children)
+                - 1: Presentation + immediate slides (no slide children)
+                - 2: Presentation + slides + slide shapes
+
+        Returns:
+            dict: Tree representation with structure:
+                {
+                    "_object_type": "Presentation",
+                    "_identity": {"title": "...", "slide_count": 5, ...},
+                    "access_path": "",
+                    "geometry": None,
+                    "content_summary": "Presentation: 'Title' (5 slides, 1 master)",
+                    "children": [...] | None
+                }
+
+        Example:
+            >>> prs = Presentation('sample.pptx')
+            >>> tree = prs.get_tree(max_depth=1)
+            >>> print(tree['content_summary'])
+            "Presentation: 'Annual Report' (12 slides, 1 master)"
+        """
+        # Root object has no access path prefix
+        return self._to_tree_node("", max_depth, _current_depth=0)
+
+    def _to_tree_node_identity(self):
+        """Override to provide rich presentation identity for tree node representation."""
+        identity = {
+            "class_name": "Presentation",
+        }
+
+        # Add title from core properties
+        try:
+            if self.core_properties and self.core_properties.title:
+                identity["title"] = self.core_properties.title
+        except Exception:
+            pass
+
+        # Add slide and master counts
+        try:
+            identity["slide_count"] = len(self.slides)
+            identity["master_count"] = len(self.slide_masters)
+        except Exception:
+            pass
+
+        # Add slide dimensions
+        try:
+            if self.slide_width and self.slide_height:
+                identity["slide_width"] = f"{self.slide_width.inches:.2f} in"
+                identity["slide_height"] = f"{self.slide_height.inches:.2f} in"
+        except Exception:
+            pass
+
+        return identity
+
+    def _to_tree_node_geometry(self):
+        """Override - presentations don't have geometry, return None."""
+        return None
+
+    def _to_tree_node_content_summary(self):
+        """Override to provide presentation content summary for tree node representation."""
+        summary_parts = []
+
+        # Presentation title
+        title = "Untitled Presentation"
+        try:
+            if self.core_properties and self.core_properties.title:
+                title = self.core_properties.title
+        except Exception:
+            pass
+
+        summary_parts.append(f"Presentation: '{title}'")
+
+        # Slide and master counts
+        try:
+            slide_count = len(self.slides)
+            master_count = len(self.slide_masters)
+
+            counts = []
+            if slide_count > 0:
+                counts.append(f"{slide_count} slide{'s' if slide_count != 1 else ''}")
+            if master_count > 0:
+                counts.append(f"{master_count} master{'s' if master_count != 1 else ''}")
+
+            if counts:
+                summary_parts.append(f"({', '.join(counts)})")
+        except Exception:
+            pass
+
+        # Slide dimensions hint
+        try:
+            if self.slide_width and self.slide_height:
+                w_in = self.slide_width.inches
+                h_in = self.slide_height.inches
+                # Only show dimensions if they're not the default 10"x7.5"
+                if not (abs(w_in - 10.0) < 0.1 and abs(h_in - 7.5) < 0.1):
+                    summary_parts.append(f"[{w_in:.1f}\"×{h_in:.1f}\"]")
+        except Exception:
+            pass
+
+        return " ".join(summary_parts)
+
+    def _to_tree_node_children(self, access_path, max_depth, current_depth):
+        """Override to provide presentation's slides as children."""
+        if current_depth > max_depth:
+            return None
+
+        children = []
+
+        try:
+            # Add slides
+            for i, slide in enumerate(self.slides):
+                slide_access_path = f"slides[{i}]"
+                if hasattr(slide, '_to_tree_node'):
+                    child_node = slide._to_tree_node(slide_access_path, max_depth, current_depth + 1)
+                    children.append(child_node)
+                else:
+                    # Fallback for slides without tree node support
+                    children.append({
+                        "_object_type": "Slide",
+                        "_identity": {
+                            "slide_id": getattr(slide, 'slide_id', 'unknown'),
+                            "class_name": "Slide"
+                        },
+                        "access_path": slide_access_path,
+                        "geometry": None,
+                        "content_summary": f"Slide {getattr(slide, 'slide_id', 'unknown')}",
+                        "children": None
+                    })
+
+        except Exception:
+            # If we can't access slides, return empty children list
+            pass
+
+        return children if children else None
