@@ -735,3 +735,277 @@ class MockFontFillFormat(FillFormat):
             "properties": {"type": {"_object_type": "MSO_FILL", "name": self._fill_type}},
             "_llm_context": {"summary": self._color_info["summary"]}
         }
+
+
+# =============================================================================
+# Image and Picture Mock Classes for FEP-015
+# =============================================================================
+
+class MockImage(IntrospectionMixin):
+    """Mock Image class for testing Image introspection."""
+
+    def __init__(self, filename="test.png", content_type="image/png",
+                 ext="png", size=(800, 600), dpi=(72, 72), blob_size=100000):
+        super().__init__()
+        self._filename = filename
+        self._content_type = content_type
+        self._ext = ext
+        self._size = size
+        self._dpi = dpi
+        self._blob_size = blob_size
+        self._sha1 = "abcd1234567890abcd1234567890abcd12345678"
+
+    @property
+    def filename(self):
+        return self._filename
+
+    @property
+    def content_type(self):
+        return self._content_type
+
+    @property
+    def ext(self):
+        return self._ext
+
+    @property
+    def size(self):
+        return self._size
+
+    @property
+    def dpi(self):
+        return self._dpi
+
+    @property
+    def sha1(self):
+        return self._sha1
+
+    @property
+    def blob(self):
+        return b"mock_image_data" * (self._blob_size // 15)  # Simulate blob
+
+    def _to_dict_identity(self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm):
+        """Provide identity information for Image introspection."""
+        identity = super()._to_dict_identity(include_private, _visited_ids, max_depth, expand_collections, format_for_llm)
+        description = f"Image data: {self.filename if self.filename else 'streamed image'} ({self.ext})"
+        identity["description"] = description
+        if self.filename:
+            identity["filename"] = self.filename
+        return identity
+
+    def _to_dict_properties(self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm):
+        """Provide properties for Image introspection."""
+        props = {}
+        props["content_type"] = self.content_type
+        props["extension"] = self.ext
+        props["sha1_hash"] = self.sha1
+        props["dimensions_px"] = {"width": self.size[0], "height": self.size[1]}
+        props["dpi"] = {"horizontal": self.dpi[0], "vertical": self.dpi[1]}
+        props["blob_size_bytes"] = len(self.blob)
+        return props
+
+    def _to_dict_relationships(self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm):
+        """Provide relationships for Image introspection."""
+        return {}
+
+    def _to_dict_llm_context(self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm):
+        """Provide LLM-friendly context for Image introspection."""
+        filename_desc = f"'{self.filename}'" if self.filename else "a streamed image"
+        width, height = self.size
+        size_mb = len(self.blob) / (1024 * 1024)
+
+        description = (
+            f"An {self.ext.upper()} image {filename_desc} with dimensions {width}x{height} pixels "
+            f"at {self.dpi[0]}x{self.dpi[1]} DPI (file size: {size_mb:.2f} MB)."
+        )
+
+        summary = f"{self.ext.upper()} image: {width}x{height}px, {size_mb:.2f}MB"
+
+        common_operations = [
+            "access image binary data via .blob property",
+            "get image dimensions via .size property",
+            "check image format via .ext property",
+            "verify integrity via .sha1 hash",
+            "examine DPI settings via .dpi property"
+        ]
+
+        return {
+            "description": description,
+            "summary": summary,
+            "common_operations": common_operations
+        }
+
+
+class MockPicture(IntrospectionMixin):
+    """Mock Picture class for testing Picture introspection."""
+
+    def __init__(self, image=None, crop_left=0.0, crop_top=0.0, crop_right=0.0, crop_bottom=0.0,
+                 auto_shape_type=None, shape_id=1, name="Picture 1"):
+        super().__init__()
+        self._image = image or MockImage()
+        self._crop_left = crop_left
+        self._crop_top = crop_top
+        self._crop_right = crop_right
+        self._crop_bottom = crop_bottom
+        self._auto_shape_type = auto_shape_type
+        self._shape_id = shape_id
+        self._name = name
+        self._line = MockLineFormat()
+
+    @property
+    def image(self):
+        return self._image
+
+    @property
+    def crop_left(self):
+        return self._crop_left
+
+    @property
+    def crop_top(self):
+        return self._crop_top
+
+    @property
+    def crop_right(self):
+        return self._crop_right
+
+    @property
+    def crop_bottom(self):
+        return self._crop_bottom
+
+    @property
+    def auto_shape_type(self):
+        return self._auto_shape_type
+
+    @property
+    def shape_id(self):
+        return self._shape_id
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def line(self):
+        return self._line
+
+    def _to_dict_identity(self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm):
+        """Provide identity information for Picture introspection."""
+        identity = {}
+        identity["class_name"] = "Picture"
+        identity["shape_id"] = self.shape_id
+        identity["name"] = self.name
+
+        try:
+            img_desc = "unknown image"
+            if self.image is not None:
+                if self.image.filename:
+                    img_desc = self.image.filename
+                else:
+                    img_desc = f"streamed {self.image.ext} image"
+            else:
+                img_desc = "no embedded image"
+        except (ValueError, AttributeError):
+            img_desc = "no embedded image"
+
+        identity["description"] = f"Picture shape displaying: {img_desc}"
+        return identity
+
+    def _to_dict_properties(self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm):
+        """Provide properties for Picture introspection."""
+        props = {}
+
+        # Add crop properties
+        props["crop_left"] = self.crop_left
+        props["crop_top"] = self.crop_top
+        props["crop_right"] = self.crop_right
+        props["crop_bottom"] = self.crop_bottom
+
+        # Add image details
+        if self.image is not None and hasattr(self.image, 'to_dict') and max_depth > 0:
+            props["image_details"] = self.image.to_dict(
+                include_relationships=True,
+                max_depth=max_depth - 1,
+                include_private=include_private,
+                expand_collections=expand_collections,
+                format_for_llm=format_for_llm,
+                _visited_ids=_visited_ids
+            )
+        elif self.image is not None:
+            props["image_details"] = {
+                "_object_type": "Image",
+                "_summary_or_truncated": True,
+                "filename": getattr(self.image, 'filename', None)
+            }
+        else:
+            props["image_details"] = "No embedded image"
+
+        # Add auto shape type
+        props["auto_shape_mask_type"] = self._format_property_value_for_to_dict(
+            self.auto_shape_type, include_private, _visited_ids, max_depth - 1, expand_collections, format_for_llm
+        )
+
+        # Add line properties
+        if max_depth > 0:
+            props["line"] = self.line.to_dict(
+                include_relationships=True,
+                max_depth=max_depth - 1,
+                include_private=include_private,
+                expand_collections=expand_collections,
+                format_for_llm=format_for_llm,
+                _visited_ids=_visited_ids
+            )
+        else:
+            props["line"] = {"_object_type": "LineFormat", "_depth_exceeded": True}
+
+        return props
+
+    def _to_dict_relationships(self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm):
+        """Provide relationships for Picture introspection."""
+        return {"image_part": "Mock image part reference"}
+
+    def _to_dict_llm_context(self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm):
+        """Provide LLM-friendly context for Picture introspection."""
+        try:
+            filename_info = "unknown image"
+            crop_info = ""
+            mask_info = ""
+
+            if self.image is not None:
+                if self.image.filename:
+                    filename_info = self.image.filename
+                else:
+                    filename_info = f"streamed {self.image.ext} image"
+            else:
+                filename_info = "no embedded image"
+
+            if any([self.crop_left, self.crop_top, self.crop_right, self.crop_bottom]):
+                crop_parts = []
+                if self.crop_left: crop_parts.append(f"{self.crop_left*100:.1f}% from left")
+                if self.crop_top: crop_parts.append(f"{self.crop_top*100:.1f}% from top")
+                if self.crop_right: crop_parts.append(f"{self.crop_right*100:.1f}% from right")
+                if self.crop_bottom: crop_parts.append(f"{self.crop_bottom*100:.1f}% from bottom")
+                crop_info = f" Cropped {', '.join(crop_parts)}."
+
+            if self.auto_shape_type and hasattr(self.auto_shape_type, 'name'):
+                mask_info = f" Masked as {self.auto_shape_type.name}."
+
+        except (ValueError, AttributeError):
+            filename_info = "no embedded image"
+
+        description = (
+            f"A PICTURE shape '{self.name}' (ID: {self.shape_id}) displaying: {filename_info}.{mask_info}{crop_info}"
+        )
+
+        summary = f"Picture: {filename_info}"
+
+        common_operations = [
+            "change image source (replace with new image)",
+            "adjust crop properties (crop_left, crop_top, crop_right, crop_bottom)",
+            "set mask shape via auto_shape_type property",
+            "modify border line properties"
+        ]
+
+        return {
+            "description": description,
+            "summary": summary,
+            "common_operations": common_operations
+        }

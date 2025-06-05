@@ -94,6 +94,24 @@ class _BasePicture(BaseShape):
         """
         return self._pic.ln
 
+    def _to_dict_properties(self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm):
+        """Provide properties for _BasePicture introspection, including crop properties."""
+        props = super()._to_dict_properties(include_private, _visited_ids, max_depth, expand_collections, format_for_llm)
+
+        crop_props = {
+            "crop_left": self.crop_left,
+            "crop_top": self.crop_top,
+            "crop_right": self.crop_right,
+            "crop_bottom": self.crop_bottom
+        }
+
+        for name, value in crop_props.items():
+            props[name] = self._format_property_value_for_to_dict(
+                value, include_private, _visited_ids, max_depth - 1, expand_collections, format_for_llm
+            )
+
+        return props
+
 
 class Movie(_BasePicture):
     """A movie shape, one that places a video on a slide.
@@ -193,6 +211,136 @@ class Picture(_BasePicture):
     def shape_type(self) -> MSO_SHAPE_TYPE:
         """Unconditionally `MSO_SHAPE_TYPE.PICTURE` in this case."""
         return MSO_SHAPE_TYPE.PICTURE
+
+    def _to_dict_identity(self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm):
+        """Provide identity information for Picture introspection."""
+        identity = super()._to_dict_identity(include_private, _visited_ids, max_depth, expand_collections, format_for_llm)
+
+        try:
+            img_desc = "unknown image"
+            if hasattr(self, 'image') and self.image:
+                if self.image.filename:
+                    img_desc = self.image.filename
+                else:
+                    img_desc = f"streamed {self.image.ext} image"
+        except (ValueError, AttributeError):
+            img_desc = "no embedded image"
+
+        identity["description"] = f"Picture shape displaying: {img_desc}"
+        return identity
+
+    def _to_dict_properties(self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm):
+        """Provide properties for Picture introspection."""
+        props = super()._to_dict_properties(include_private, _visited_ids, max_depth, expand_collections, format_for_llm)
+
+        try:
+            if hasattr(self, 'image') and self.image and hasattr(self.image, 'to_dict') and max_depth > 0:
+                props["image_details"] = self.image.to_dict(
+                    include_relationships=True,
+                    max_depth=max_depth - 1,
+                    include_private=include_private,
+                    expand_collections=expand_collections,
+                    format_for_llm=format_for_llm,
+                    _visited_ids=_visited_ids
+                )
+            elif hasattr(self, 'image') and self.image:
+                props["image_details"] = {
+                    "_object_type": "Image",
+                    "_summary_or_truncated": True,
+                    "filename": getattr(self.image, 'filename', None)
+                }
+        except (ValueError, AttributeError) as e:
+            props["image_details"] = self._create_error_context("image_details", e, "image details access failed")
+
+        props["auto_shape_mask_type"] = self._format_property_value_for_to_dict(
+            self.auto_shape_type, include_private, _visited_ids, max_depth - 1, expand_collections, format_for_llm
+        )
+
+        if max_depth > 0:
+            props["line"] = self.line.to_dict(
+                include_relationships=True,
+                max_depth=max_depth - 1,
+                include_private=include_private,
+                expand_collections=expand_collections,
+                format_for_llm=format_for_llm,
+                _visited_ids=_visited_ids
+            )
+        else:
+            props["line"] = {"_object_type": "LineFormat", "_depth_exceeded": True}
+
+        return props
+
+    def _to_dict_relationships(self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm):
+        """Provide relationships for Picture introspection."""
+        rels = super()._to_dict_relationships(include_private, _visited_ids, max_depth, expand_collections, format_for_llm)
+
+        try:
+            if hasattr(self, 'image') and self.image and hasattr(self.image, '_blob'):
+                image_part = self.part.related_part(self._pic.blip_rId)
+                if hasattr(image_part, 'to_dict'):
+                    rels["image_part"] = image_part.to_dict(
+                        include_relationships=False,
+                        max_depth=0,
+                        include_private=include_private,
+                        expand_collections=False,
+                        format_for_llm=format_for_llm,
+                        _visited_ids=_visited_ids
+                    )
+                else:
+                    rels["image_part_ref"] = repr(image_part)
+        except (ValueError, KeyError, AttributeError):
+            rels["image_part"] = "No related image part found or error."
+
+        return rels
+
+    def _to_dict_llm_context(self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm):
+        """Provide LLM-friendly context for Picture introspection."""
+        context = super()._to_dict_llm_context(include_private, _visited_ids, max_depth, expand_collections, format_for_llm)
+
+        try:
+            filename_info = "unknown image"
+            crop_info = ""
+            mask_info = ""
+
+            if hasattr(self, 'image') and self.image:
+                if self.image.filename:
+                    filename_info = self.image.filename
+                else:
+                    filename_info = f"streamed {self.image.ext} image"
+
+            if any([self.crop_left, self.crop_top, self.crop_right, self.crop_bottom]):
+                crop_parts = []
+                if self.crop_left: crop_parts.append(f"{self.crop_left*100:.1f}% from left")
+                if self.crop_top: crop_parts.append(f"{self.crop_top*100:.1f}% from top")
+                if self.crop_right: crop_parts.append(f"{self.crop_right*100:.1f}% from right")
+                if self.crop_bottom: crop_parts.append(f"{self.crop_bottom*100:.1f}% from bottom")
+                crop_info = f" Cropped {', '.join(crop_parts)}."
+
+            if self.auto_shape_type and hasattr(self.auto_shape_type, 'name'):
+                mask_info = f" Masked as {self.auto_shape_type.name}."
+
+        except (ValueError, AttributeError):
+            filename_info = "no embedded image"
+
+        # Get the existing description from BaseShape and enhance it
+        base_description = context.get("description", "")
+        enhanced_description = f"{base_description} displaying: {filename_info}.{mask_info}{crop_info}"
+        context["description"] = enhanced_description
+
+        # Add summary if not present
+        if "summary" not in context:
+            context["summary"] = f"Picture: {filename_info}"
+
+        common_operations = context.get("common_operations", [])
+        common_operations.extend([
+            "change image source (replace with new image)",
+            "adjust crop properties (crop_left, crop_top, crop_right, crop_bottom)",
+            "set mask shape via auto_shape_type property",
+            "modify border line properties"
+        ])
+        context["common_operations"] = common_operations
+
+        return context
 
 
 class _MediaFormat(ParentedElementProxy):
