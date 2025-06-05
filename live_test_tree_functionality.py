@@ -281,7 +281,7 @@ def test_presentation_tree_functionality():
         tree = slide.get_tree(max_depth=10)
         assert isinstance(tree, dict), "Should handle large max_depth gracefully"
         
-        print(f"  Error handling tests passed")
+        print("  Error handling tests passed")
     
     # Run all tests
     run_test("Basic Presentation Creation", test_basic_presentation_creation)

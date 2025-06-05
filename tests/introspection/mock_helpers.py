@@ -1276,7 +1276,7 @@ class MockSlide(IntrospectionMixin):
         # Mock placeholders collection with len and items
         placeholders_with_methods = Mock()
         placeholders_with_methods.__len__ = lambda: 2
-        placeholders_with_methods.items = lambda: self.placeholders.items()
+        placeholders_with_methods.items = self.placeholders.items
         self.placeholders = placeholders_with_methods
         
         # Mock part for parent relationship
