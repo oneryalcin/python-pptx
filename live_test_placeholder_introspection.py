@@ -75,7 +75,7 @@ def test_placeholder_format_introspection():
             assert "type" in ph_dict["properties"]
             assert "_llm_context" in ph_dict
             
-            print(f"✓ PlaceholderFormat.to_dict() structure validated")
+            print("✓ PlaceholderFormat.to_dict() structure validated")
             
             # Test LLM context
             llm_context = ph_dict["_llm_context"]
@@ -120,7 +120,7 @@ def test_enhanced_baseshape_placeholder_details():
                 
                 # Check identity section
                 identity = shape_dict["_identity"]
-                assert identity["is_placeholder"] == True
+                assert identity["is_placeholder"] is True
                 assert "placeholder_details" in identity
                 
                 # Verify placeholder_details is from PlaceholderFormat.to_dict()
@@ -141,7 +141,7 @@ def test_enhanced_baseshape_placeholder_details():
                 # Verify placeholder information is in shape description
                 assert "placeholder" in description.lower()
                 
-                print(f"✓ Enhanced placeholder details validated")
+                print("✓ Enhanced placeholder details validated")
                 
                 # Break after first placeholder to avoid too much output
                 break
@@ -215,7 +215,7 @@ def test_error_handling():
         shape_dict = shape.to_dict(max_depth=2, include_relationships=False)
         identity = shape_dict["_identity"]
         
-        assert identity["is_placeholder"] == False
+        assert identity["is_placeholder"] is False
         assert "placeholder_details" not in identity
         
         print("✓ Non-placeholder shape correctly handled")
@@ -233,7 +233,7 @@ def test_error_handling():
         shape_dict = shape.to_dict(max_depth=2, include_relationships=False)
         identity = shape_dict["_identity"]
         
-        assert identity["is_placeholder"] == True
+        assert identity["is_placeholder"] is True
         assert "placeholder_details" in identity
         
         # Verify the placeholder details structure
