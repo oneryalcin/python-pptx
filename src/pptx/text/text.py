@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 from typing import TYPE_CHECKING, Iterator, cast
 
 from lxml import etree
@@ -34,7 +35,7 @@ if TYPE_CHECKING:
     from pptx.types import ProvidesExtents, ProvidesPart
 
 
-class TextFrame(Subshape):
+class TextFrame(Subshape, IntrospectionMixin):
     """The part of a shape that contains its text.
 
     Not all shapes have a text frame. Corresponds to the `p:txBody` element that can
@@ -43,6 +44,7 @@ class TextFrame(Subshape):
 
     def __init__(self, txBody: CT_TextBody, parent: ProvidesPart):
         super(TextFrame, self).__init__(parent)
+        IntrospectionMixin.__init__(self)
         self._element = self._txBody = txBody
         self._parent = parent
 
@@ -186,11 +188,15 @@ class TextFrame(Subshape):
         style hierarchy. Assigning |None| removes any explicit setting, causing its inherited
         value to be used.
         """
-        return self._txBody.lstStyle.lv1bPr.algn
+        lv1bPr = getattr(self._txBody.lstStyle, "lv1bPr", None)
+        if lv1bPr is None:
+            return None
+        return lv1bPr.algn
 
     @alignment.setter
     def alignment(self, value: PP_PARAGRAPH_ALIGNMENT | None):
-        self._txBody.lstStyle.lv1bPr.algn = value
+        lv1bPr = self._txBody.lstStyle.get_or_add_lv1bPr()
+        lv1bPr.algn = value
 
     @property
     def level(self) -> int:
@@ -200,11 +206,15 @@ class TextFrame(Subshape):
         default value. Indentation level is most commonly encountered in a bulleted list, as is
         found on a word bullet slide.
         """
-        return self._txBody.lstStyle.lv1bPr.lvl
+        lv1bPr = getattr(self._txBody.lstStyle, "lv1bPr", None)
+        if lv1bPr is None:
+            return 0  # Default level
+        return lv1bPr.lvl
 
     @level.setter
     def level(self, level: int):
-        self._txBody.lstStyle.lv1bPr.lvl = level
+        lv1bPr = self._txBody.lstStyle.get_or_add_lv1bPr()
+        lv1bPr.lvl = level
 
     @property
     def font(self) -> Font:
@@ -254,6 +264,208 @@ class TextFrame(Subshape):
             False: ST_TextWrappingType.NONE,
             None: None,
         }[value]
+
+    # -- IntrospectionMixin overrides --
+
+    def _to_dict_identity(
+        self, _visited_ids, max_depth, expand_collections, format_for_llm, include_private
+    ):
+        """Override to provide text frame-specific identity information."""
+        identity = super()._to_dict_identity(
+            _visited_ids, max_depth, expand_collections, format_for_llm, include_private
+        )
+        identity["description"] = "Container for text within a shape."
+
+        # Add parent shape info if available
+        if self._parent and hasattr(self._parent, "name"):
+            with contextlib.suppress(Exception):
+                identity["parent_shape_name"] = self._parent.name
+
+        return identity
+
+    def _to_dict_properties(
+        self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm
+    ):
+        """Override to expose text frame properties and paragraphs."""
+        props = {}
+
+        # Full text content
+        props["text"] = self.text
+
+        # Paragraphs collection (recursive calls to FEP-010)
+        try:
+            if expand_collections and max_depth > 1:
+                paragraphs_list = []
+                for paragraph in self.paragraphs:
+                    if hasattr(paragraph, "to_dict"):
+                        paragraphs_list.append(
+                            paragraph.to_dict(
+                                include_relationships=True,
+                                max_depth=max_depth - 1,
+                                include_private=include_private,
+                                expand_collections=expand_collections,
+                                format_for_llm=format_for_llm,
+                                _visited_ids=_visited_ids,
+                            )
+                        )
+                    else:
+                        paragraphs_list.append(
+                            {"_object_type": "_Paragraph", "_no_introspection": True}
+                        )
+                props["paragraphs"] = paragraphs_list
+            elif expand_collections:
+                props["paragraphs"] = [
+                    {"_object_type": "_Paragraph", "_depth_exceeded": True} for _ in self.paragraphs
+                ]
+            else:
+                props["paragraphs"] = {"_collection_summary": f"{len(self.paragraphs)} paragraphs"}
+        except Exception as e:
+            props["paragraphs"] = self._create_error_context(
+                "paragraphs", e, "paragraphs collection access failed"
+            )
+
+        # Margin properties
+        margin_attrs = ["margin_left", "margin_top", "margin_right", "margin_bottom"]
+        for attr_name in margin_attrs:
+            try:
+                attr_value = getattr(self, attr_name)
+                props[attr_name] = self._format_property_value_for_to_dict(
+                    attr_value,
+                    include_private,
+                    _visited_ids,
+                    max_depth,
+                    expand_collections,
+                    format_for_llm,
+                )
+            except Exception as e:
+                props[attr_name] = self._create_error_context(
+                    attr_name, e, "margin property access failed"
+                )
+
+        # Text frame behavior properties
+        text_frame_attrs = ["vertical_anchor", "word_wrap", "auto_size", "alignment", "level"]
+        for attr_name in text_frame_attrs:
+            try:
+                attr_value = getattr(self, attr_name)
+                props[attr_name] = self._format_property_value_for_to_dict(
+                    attr_value,
+                    include_private,
+                    _visited_ids,
+                    max_depth,
+                    expand_collections,
+                    format_for_llm,
+                )
+            except Exception as e:
+                props[attr_name] = self._create_error_context(
+                    attr_name, e, f"{attr_name} property access failed"
+                )
+
+        # Default font for the text frame (recursive call to FEP-007)
+        try:
+            if max_depth > 1:
+                props["font"] = self.font.to_dict(
+                    include_relationships=False,
+                    max_depth=max_depth - 1,
+                    include_private=include_private,
+                    expand_collections=expand_collections,
+                    format_for_llm=format_for_llm,
+                    _visited_ids=_visited_ids,
+                )
+            else:
+                props["font"] = {"_object_type": "Font", "_depth_exceeded": True}
+        except Exception as e:
+            props["font"] = self._create_error_context("font", e, "font access failed")
+
+        return props
+
+    def _to_dict_relationships(
+        self, remaining_depth, expand_collections, _visited_ids, format_for_llm, include_private
+    ):
+        """Override to include parent shape relationship."""
+        rels = super()._to_dict_relationships(
+            remaining_depth, expand_collections, _visited_ids, format_for_llm, include_private
+        )
+
+        # Parent shape (the shape containing this text frame)
+        if self._parent is not None:
+            if hasattr(self._parent, "to_dict") and callable(getattr(self._parent, "to_dict")):
+                try:
+                    rels["parent_shape"] = self._parent.to_dict(
+                        include_relationships=False,
+                        max_depth=0,  # Summary only
+                        include_private=include_private,
+                        expand_collections=False,
+                        format_for_llm=format_for_llm,
+                        _visited_ids=_visited_ids,
+                    )
+                except Exception:
+                    # Fallback to repr if to_dict fails
+                    rels["parent_shape"] = repr(self._parent)
+            else:
+                # Fallback to repr if no to_dict method
+                rels["parent_shape"] = repr(self._parent)
+
+        return rels
+
+    def _to_dict_llm_context(
+        self, _visited_ids, max_depth, expand_collections, format_for_llm, include_private
+    ):
+        """Override to provide text frame-specific LLM context."""
+        context = super()._to_dict_llm_context(
+            _visited_ids, max_depth, expand_collections, format_for_llm, include_private
+        )
+
+        # Build descriptive context
+        try:
+            text_preview = self.text[:100].replace("\n", " ").replace("\v", " ")
+            if len(self.text) > 100:
+                text_preview += "..."
+
+            desc_parts = [f"TextFrame containing {len(self.paragraphs)} paragraph(s)."]
+            if text_preview.strip():
+                desc_parts.append(f'Text starts with: "{text_preview}".')
+
+            # Key properties summary
+            try:
+                if self.auto_size is not None:
+                    desc_parts.append(f"Auto-size: {self.auto_size.name}.")
+            except Exception:
+                pass
+
+            try:
+                if self.word_wrap is not None:
+                    desc_parts.append(f"Word wrap: {'On' if self.word_wrap else 'Off'}.")
+            except Exception:
+                pass
+
+            try:
+                if self.vertical_anchor is not None:
+                    desc_parts.append(f"Vertical anchor: {self.vertical_anchor.name}.")
+            except Exception:
+                pass
+
+            context["description"] = " ".join(
+                p.rstrip(".") + "." for p in desc_parts if p.rstrip(".")
+            )
+            context["summary"] = context["description"]
+
+            context["common_operations"] = [
+                "access/modify text (text_frame.text = ...)",
+                "add paragraphs (text_frame.add_paragraph())",
+                "access paragraphs (text_frame.paragraphs)",
+                "set margins (text_frame.margin_left = Inches(...))",
+                "set vertical anchor (text_frame.vertical_anchor = MSO_ANCHOR...)",
+                "set word wrap (text_frame.word_wrap = True/False/None)",
+                "set auto-size (text_frame.auto_size = MSO_AUTO_SIZE...)",
+                "set default paragraph alignment/level (text_frame.alignment, text_frame.level)",
+                "set default font (text_frame.font...)",
+            ]
+
+        except Exception as e:
+            context["description"] = f"TextFrame with introspection error: {str(e)}"
+            context["summary"] = context["description"]
+
+        return context
 
     def _apply_fit(self, font_family: str, font_size: int, is_bold: bool, is_italic: bool):
         """Arrange text in this text frame to fit inside its extents.
