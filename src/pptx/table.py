@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Iterator
 
 from pptx.dml.fill import FillFormat
+from pptx.introspection import IntrospectionMixin
 from pptx.oxml.table import TcRange
 from pptx.shapes import Subshape
 from pptx.text.text import TextFrame
@@ -19,7 +20,7 @@ if TYPE_CHECKING:
     from pptx.util import Length
 
 
-class Table(object):
+class Table(IntrospectionMixin):
     """A DrawingML table object.
 
     Not intended to be constructed directly, use
@@ -164,8 +165,148 @@ class Table(object):
     def vert_banding(self, value: bool):
         self._tbl.bandCol = value
 
+    def _to_dict_properties(
+        self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm
+    ):
+        """Get table-specific properties for introspection."""
+        props = {}
 
-class _Cell(Subshape):
+        # Table formatting flags
+        props["first_row"] = self._get_property_safely("first_row")
+        props["last_row"] = self._get_property_safely("last_row")
+        props["first_col"] = self._get_property_safely("first_col")
+        props["last_col"] = self._get_property_safely("last_col")
+        props["horz_banding"] = self._get_property_safely("horz_banding")
+        props["vert_banding"] = self._get_property_safely("vert_banding")
+
+        # Table structure as rows of cells
+        if expand_collections:
+            try:
+                rows_data = []
+                row_count = len(self.rows)
+                col_count = len(self.columns) if row_count > 0 else 0
+
+                for row_idx in range(row_count):
+                    row_cells = []
+                    for col_idx in range(col_count):
+                        try:
+                            cell = self.cell(row_idx, col_idx)
+                            cell_data = self._format_property_value_for_to_dict(
+                                cell,
+                                include_private,
+                                _visited_ids,
+                                max_depth - 1,
+                                expand_collections,
+                                format_for_llm,
+                            )
+                            row_cells.append(cell_data)
+                        except Exception as e:
+                            row_cells.append(
+                                self._create_error_context(
+                                    f"cell[{row_idx}][{col_idx}]", e, "cell access failed"
+                                )
+                            )
+                    rows_data.append(row_cells)
+
+                props["rows"] = rows_data
+            except Exception as e:
+                props["rows"] = self._create_error_context(
+                    "rows", e, "table structure access failed"
+                )
+        else:
+            # Just provide summary when not expanding collections
+            try:
+                row_count = len(self.rows)
+                col_count = len(self.columns) if row_count > 0 else 0
+                props["rows"] = (
+                    f"<{row_count} rows x {col_count} columns table structure - "
+                    f"use expand_collections=True to see full content>"
+                )
+            except Exception as e:
+                props["rows"] = self._create_error_context(
+                    "rows", e, "table dimensions access failed"
+                )
+
+        return props
+
+    def _to_dict_relationships(
+        self, include_relationships, _visited_ids, max_depth, expand_collections, format_for_llm
+    ):
+        """Get table relationships for introspection."""
+        if not include_relationships:
+            return {}
+
+        relationships = {}
+
+        # Parent graphic frame relationship
+        try:
+            if hasattr(self, "_graphic_frame") and self._graphic_frame:
+                relationships["parent_graphic_frame"] = self._format_property_value_for_to_dict(
+                    self._graphic_frame,
+                    False,
+                    _visited_ids,
+                    max_depth - 1,
+                    expand_collections,
+                    format_for_llm,
+                )
+        except Exception as e:
+            relationships["parent_graphic_frame"] = self._create_error_context(
+                "parent_graphic_frame", e, "graphic frame access failed"
+            )
+
+        return relationships
+
+    def _to_dict_llm_context(
+        self, _visited_ids, max_depth, expand_collections, format_for_llm, include_private
+    ):
+        """Generate LLM-friendly context for table introspection."""
+        try:
+            row_count = len(self.rows)
+            col_count = len(self.columns) if row_count > 0 else 0
+            dimensions_desc = f"{row_count}x{col_count}"
+        except Exception:
+            dimensions_desc = "unknown dimensions"
+
+        # Collect formatting descriptions
+        formatting_features = []
+        try:
+            if self.first_row:
+                formatting_features.append("special first row formatting")
+            if self.last_row:
+                formatting_features.append("special last row formatting")
+            if self.first_col:
+                formatting_features.append("special first column formatting")
+            if self.last_col:
+                formatting_features.append("special last column formatting")
+            if self.horz_banding:
+                formatting_features.append("horizontal banding")
+            if self.vert_banding:
+                formatting_features.append("vertical banding")
+        except Exception:
+            pass
+
+        formatting_desc = f" with {', '.join(formatting_features)}" if formatting_features else ""
+
+        return {
+            "summary": f"A {dimensions_desc} table{formatting_desc}.",
+            "common_operations": [
+                "access cell (table.cell(row, col))",
+                "iterate cells (table.iter_cells())",
+                "access rows/columns (table.rows, table.columns)",
+                "modify formatting (table.first_row, table.horz_banding, etc.)",
+                "get dimensions (len(table.rows), len(table.columns))",
+            ],
+        }
+
+    def _get_property_safely(self, property_name, method_name="accessing property"):
+        """Safely access a property that might raise exceptions."""
+        try:
+            return getattr(self, property_name)
+        except (NotImplementedError, ValueError, AttributeError):
+            return None
+
+
+class _Cell(IntrospectionMixin, Subshape):
     """Table cell"""
 
     def __init__(self, tc: CT_TableCell, parent: ProvidesPart):
@@ -319,7 +460,7 @@ class _Cell(Subshape):
         `.is_merge_origin` before calling.
         """
         if not self.is_merge_origin:
-            raise ValueError("not a merge-origin cell; only a merge-origin cell can be sp" "lit")
+            raise ValueError("not a merge-origin cell; only a merge-origin cell can be split")
 
         tc_range = TcRange.from_merge_origin(self._tc)
 
@@ -369,6 +510,142 @@ class _Cell(Subshape):
     @vertical_anchor.setter
     def vertical_anchor(self, mso_anchor_idx: MSO_VERTICAL_ANCHOR | None):
         self._tc.anchor = mso_anchor_idx
+
+    def _to_dict_properties(
+        self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm
+    ):
+        """Get cell-specific properties for introspection."""
+        props = {}
+
+        # Text frame property
+        try:
+            props["text_frame"] = self._format_property_value_for_to_dict(
+                self.text_frame,
+                include_private,
+                _visited_ids,
+                max_depth - 1,
+                expand_collections,
+                format_for_llm,
+            )
+        except Exception as e:
+            props["text_frame"] = self._create_error_context("text_frame", e, "access failed")
+
+        # Fill property
+        try:
+            props["fill"] = self._format_property_value_for_to_dict(
+                self.fill,
+                include_private,
+                _visited_ids,
+                max_depth - 1,
+                expand_collections,
+                format_for_llm,
+            )
+        except Exception as e:
+            props["fill"] = self._create_error_context("fill", e, "access failed")
+
+        # Margin properties
+        props["margin_left"] = self._format_property_value_for_to_dict(
+            self._get_margin_safely("margin_left"),
+            include_private,
+            _visited_ids,
+            max_depth - 1,
+            expand_collections,
+            format_for_llm,
+        )
+        props["margin_right"] = self._format_property_value_for_to_dict(
+            self._get_margin_safely("margin_right"),
+            include_private,
+            _visited_ids,
+            max_depth - 1,
+            expand_collections,
+            format_for_llm,
+        )
+        props["margin_top"] = self._format_property_value_for_to_dict(
+            self._get_margin_safely("margin_top"),
+            include_private,
+            _visited_ids,
+            max_depth - 1,
+            expand_collections,
+            format_for_llm,
+        )
+        props["margin_bottom"] = self._format_property_value_for_to_dict(
+            self._get_margin_safely("margin_bottom"),
+            include_private,
+            _visited_ids,
+            max_depth - 1,
+            expand_collections,
+            format_for_llm,
+        )
+
+        # Vertical anchor property
+        props["vertical_anchor"] = self._format_property_value_for_to_dict(
+            self._get_property_safely("vertical_anchor"),
+            include_private,
+            _visited_ids,
+            max_depth - 1,
+            expand_collections,
+            format_for_llm,
+        )
+
+        # Merge status properties
+        props["is_merge_origin"] = self._get_property_safely("is_merge_origin")
+        props["is_spanned"] = self._get_property_safely("is_spanned")
+        props["span_height"] = self._get_property_safely("span_height")
+        props["span_width"] = self._get_property_safely("span_width")
+
+        return props
+
+    def _to_dict_llm_context(
+        self, _visited_ids, max_depth, expand_collections, format_for_llm, include_private
+    ):
+        """Generate LLM-friendly context for cell introspection."""
+        try:
+            text_content = self.text_frame.text.strip() if hasattr(self, "text_frame") else ""
+            if len(text_content) > 50:
+                content_desc = f"containing '{text_content[:50]}...'"
+            elif text_content:
+                content_desc = f"containing '{text_content}'"
+            else:
+                content_desc = "empty"
+        except Exception:
+            content_desc = "with inaccessible content"
+
+        merge_desc = ""
+        try:
+            if self.is_merge_origin:
+                span_height = self.span_height or 1
+                span_width = self.span_width or 1
+                if span_height > 1 or span_width > 1:
+                    merge_desc = f" Merged across {span_width} column(s) and {span_height} row(s)."
+            elif self.is_spanned:
+                merge_desc = " Spanned by a merged cell."
+        except Exception:
+            pass
+
+        return {
+            "summary": f"Cell {content_desc}.{merge_desc}",
+            "common_operations": [
+                "access text (cell.text)",
+                "modify text (cell.text = 'new')",
+                "access text_frame (cell.text_frame)",
+                "modify fill (cell.fill)",
+                "check merge status (cell.is_merge_origin, cell.is_spanned)",
+            ],
+        }
+
+    def _get_property_safely(self, property_name, method_name="accessing property"):
+        """Safely access a property that might raise exceptions."""
+        try:
+            return getattr(self, property_name)
+        except (NotImplementedError, ValueError, AttributeError):
+            return None
+
+    def _get_margin_safely(self, margin_property):
+        """Safely access margin properties which might be None or raise exceptions."""
+        try:
+            return getattr(self, margin_property)
+        except (NotImplementedError, ValueError, AttributeError):
+            return None
 
     @staticmethod
     def _validate_margin_value(margin_value: Length | None) -> None:
