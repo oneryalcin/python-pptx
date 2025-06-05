@@ -353,3 +353,222 @@ class Shape(BaseShape):
         """
         txBody = self._sp.get_or_add_txBody()
         return TextFrame(txBody, self)
+
+    # -- IntrospectionMixin overrides --
+
+    def _to_dict_identity(
+        self, _visited_ids, max_depth, expand_collections, format_for_llm, include_private
+    ):
+        """Override to include AutoShape-specific identity information."""
+        identity = super()._to_dict_identity(
+            _visited_ids, max_depth, expand_collections, format_for_llm, include_private
+        )
+
+        # Add specific AutoShape type details if it's an AutoShape with preset geometry
+        if self.shape_type == MSO_SHAPE_TYPE.AUTO_SHAPE:
+            auto_shape_type = self._get_auto_shape_type_safely()
+            if auto_shape_type is not None:
+                identity["auto_shape_type_details"] = self._format_property_value_for_to_dict(
+                    auto_shape_type,
+                    include_private,
+                    _visited_ids,
+                    max_depth,
+                    expand_collections,
+                    format_for_llm,
+                )
+
+        return identity
+
+    def _to_dict_properties(
+        self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm
+    ):
+        """Override to include AutoShape-specific properties."""
+        props = super()._to_dict_properties(
+            include_private, _visited_ids, max_depth, expand_collections, format_for_llm
+        )
+
+        # Add adjustments (list of floats)
+        try:
+            adjustments_collection = self.adjustments
+            if len(adjustments_collection) > 0:
+                # Convert AdjustmentCollection to list of float values
+                adjustments_list = [
+                    adjustments_collection[i] for i in range(len(adjustments_collection))
+                ]
+                props["adjustments"] = adjustments_list
+        except Exception as e:
+            props["adjustments"] = self._create_error_context(
+                "adjustments", e, "adjustments access failed"
+            )
+
+        # Add fill and line properties (they should have their own to_dict methods from FEP-005 and FEP-006)
+        if max_depth > 1:
+            try:
+                props["fill"] = self.fill.to_dict(
+                    include_relationships=True,
+                    max_depth=max_depth - 1,
+                    include_private=include_private,
+                    expand_collections=expand_collections,
+                    format_for_llm=format_for_llm,
+                    _visited_ids=_visited_ids,
+                )
+            except Exception as e:
+                props["fill"] = self._create_error_context("fill", e, "fill access failed")
+
+            try:
+                props["line"] = self.line.to_dict(
+                    include_relationships=True,
+                    max_depth=max_depth - 1,
+                    include_private=include_private,
+                    expand_collections=expand_collections,
+                    format_for_llm=format_for_llm,
+                    _visited_ids=_visited_ids,
+                )
+            except Exception as e:
+                props["line"] = self._create_error_context("line", e, "line access failed")
+        else:
+            # Depth exceeded, provide minimal info
+            props["fill"] = {"_object_type": "FillFormat", "_depth_exceeded": True}
+            props["line"] = {"_object_type": "LineFormat", "_depth_exceeded": True}
+
+        # Add text_frame property (with fallback if FEP-011 TextFrame.to_dict is not available)
+        if self.has_text_frame:
+            try:
+                text_frame = self.text_frame
+                if hasattr(text_frame, "to_dict") and callable(getattr(text_frame, "to_dict")):
+                    if max_depth > 1:
+                        props["text_frame"] = text_frame.to_dict(
+                            include_relationships=True,
+                            max_depth=max_depth - 1,
+                            include_private=include_private,
+                            expand_collections=expand_collections,
+                            format_for_llm=format_for_llm,
+                            _visited_ids=_visited_ids,
+                        )
+                    else:
+                        props["text_frame"] = {"_object_type": "TextFrame", "_depth_exceeded": True}
+                else:
+                    # Fallback if TextFrame.to_dict isn't available (FEP-011 not implemented yet)
+                    text_preview = (
+                        text_frame.text[:50] + "..."
+                        if len(text_frame.text) > 50
+                        else text_frame.text
+                    )
+                    props["text_frame_summary"] = {
+                        "_object_type": "TextFrame",
+                        "text_preview": text_preview,
+                        "text_length": len(text_frame.text),
+                        "_note": "Full TextFrame introspection pending FEP-011",
+                    }
+            except Exception as e:
+                props["text_frame"] = self._create_error_context(
+                    "text_frame", e, "text_frame access failed"
+                )
+        else:
+            props["text_frame"] = None
+
+        return props
+
+    def _to_dict_llm_context(
+        self, _visited_ids, max_depth, expand_collections, format_for_llm, include_private
+    ):
+        """Override to provide AutoShape-specific LLM context."""
+        context = super()._to_dict_llm_context(
+            _visited_ids, max_depth, expand_collections, format_for_llm, include_private
+        )
+
+        # Build enhanced description
+        desc_parts = []
+
+        # Determine shape type description
+        if self.shape_type == MSO_SHAPE_TYPE.AUTO_SHAPE:
+            auto_shape_type = self._get_auto_shape_type_safely()
+            if auto_shape_type is not None:
+                desc_parts.append(f"An AutoShape of type {auto_shape_type.name}")
+            else:
+                desc_parts.append("An AutoShape")
+        elif self.shape_type == MSO_SHAPE_TYPE.TEXT_BOX:
+            desc_parts.append("A Text Box shape")
+        elif self.shape_type == MSO_SHAPE_TYPE.PLACEHOLDER:
+            desc_parts.append("A placeholder shape")
+        elif self.shape_type == MSO_SHAPE_TYPE.FREEFORM:
+            desc_parts.append("A Freeform shape")
+        else:
+            desc_parts.append("A shape")
+
+        desc_parts.append(f"named '{self.name}' (ID: {self.shape_id})")
+
+        # Add placeholder details if applicable
+        if self.is_placeholder:
+            placeholder_info = self._get_placeholder_info_safely(
+                include_private, _visited_ids, max_depth, expand_collections, format_for_llm
+            )
+            if (
+                placeholder_info
+                and isinstance(placeholder_info, dict)
+                and "type" in placeholder_info
+            ):
+                ph_type = placeholder_info["type"]
+                if isinstance(ph_type, dict) and "name" in ph_type:
+                    desc_parts.append(f"serving as a {ph_type['name']} placeholder")
+                else:
+                    desc_parts.append("serving as a placeholder")
+
+        context["description"] = " ".join(desc_parts) + "."
+
+        # Build enhanced summary with AutoShape-specific details
+        summary_parts = [context["description"]]
+
+        # Text content preview
+        try:
+            if self.has_text_frame and self.text_frame.text:
+                text_preview = self.text_frame.text[:30].replace("\n", " ").replace("\v", " ")
+                if len(self.text_frame.text) > 30:
+                    text_preview += "..."
+                summary_parts.append(f'Contains text: "{text_preview}"')
+        except Exception:
+            # Don't fail on text access issues
+            pass
+
+        # Adjustments information
+        try:
+            adjustments_count = len(self.adjustments)
+            if adjustments_count > 0:
+                summary_parts.append(f"Has {adjustments_count} adjustment handle(s)")
+        except Exception:
+            # Don't fail on adjustments access issues
+            pass
+
+        context["summary"] = ". ".join(s.rstrip(".") for s in summary_parts if s) + "."
+
+        # Add AutoShape-specific common operations
+        operations = context.get("common_operations", [])
+        operations.extend(
+            ["access/modify text_frame", "change fill properties", "change line properties"]
+        )
+
+        # Add adjustment operations if shape has adjustments
+        try:
+            if len(self.adjustments) > 0:
+                operations.append("modify adjustment values")
+        except Exception:
+            pass
+
+        context["common_operations"] = operations
+
+        return context
+
+    # -- Helper methods for safe property access --
+
+    def _get_auto_shape_type_safely(self):
+        """Get auto_shape_type with safe error handling."""
+        try:
+            if self.shape_type == MSO_SHAPE_TYPE.AUTO_SHAPE:
+                return self.auto_shape_type
+            return None
+        except (ValueError, AttributeError):
+            # auto_shape_type raises ValueError if not an autoshape
+            return None
+        except Exception:
+            # Handle any other unexpected errors
+            return None
