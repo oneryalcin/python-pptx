@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Iterator, cast
 
 from pptx.dml.fill import FillFormat
 from pptx.enum.shapes import PP_PLACEHOLDER
+from pptx.introspection import IntrospectionMixin
 from pptx.shapes.shapetree import (
     LayoutPlaceholders,
     LayoutShapes,
@@ -173,10 +174,14 @@ class NotesSlide(_BaseSlide):
         return NotesSlideShapes(self._element.spTree, self)
 
 
-class Slide(_BaseSlide):
+class Slide(_BaseSlide, IntrospectionMixin):
     """Slide object. Provides access to shapes and slide-level properties."""
 
     part: SlidePart  # pyright: ignore[reportIncompatibleMethodOverride]
+
+    def __init__(self, element, part):
+        super(Slide, self).__init__(element, part)
+        IntrospectionMixin.__init__(self)
 
     @property
     def follow_master_background(self):
@@ -233,6 +238,234 @@ class Slide(_BaseSlide):
     def slide_layout(self) -> SlideLayout:
         """|SlideLayout| object this slide inherits appearance from."""
         return self.part.slide_layout
+
+    # -- IntrospectionMixin overrides --
+
+    def _to_dict_identity(
+        self, _visited_ids, max_depth, expand_collections, format_for_llm, include_private
+    ):
+        """Override to provide slide-specific identity information."""
+        identity = super()._to_dict_identity(
+            _visited_ids, max_depth, expand_collections, format_for_llm, include_private
+        )
+        identity["description"] = f"Represents slide ID {self.slide_id}."
+        identity["slide_id"] = self.slide_id
+        if self.name:  # slide.name can be empty string
+            identity["name"] = self.name
+        return identity
+
+    def _to_dict_properties(
+        self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm
+    ):
+        """Override to expose slide properties and collections."""
+        props = {}
+
+        # Basic slide properties
+        props["has_notes_slide"] = self.has_notes_slide
+        props["follow_master_background"] = self.follow_master_background
+
+        # Shapes collection (recursive, FEP-003/008 etc.)
+        try:
+            if expand_collections and max_depth > 0:
+                shapes_list = []
+                for shape in self.shapes:
+                    if hasattr(shape, "to_dict"):
+                        shapes_list.append(
+                            shape.to_dict(
+                                include_relationships=True,
+                                max_depth=max_depth - 1,
+                                include_private=include_private,
+                                expand_collections=expand_collections,
+                                format_for_llm=format_for_llm,
+                                _visited_ids=_visited_ids,
+                            )
+                        )
+                    else:
+                        shapes_list.append({"_object_type": "BaseShape", "_no_introspection": True})
+                props["shapes"] = shapes_list
+            elif expand_collections:
+                props["shapes"] = [
+                    {"_object_type": "BaseShape", "_depth_exceeded": True} for _ in self.shapes
+                ]
+            else:
+                props["shapes"] = {"_collection_summary": f"{len(self.shapes)} shapes"}
+        except Exception as e:
+            props["shapes"] = self._create_error_context(
+                "shapes", e, "shapes collection access failed"
+            )
+
+        # Placeholders collection
+        try:
+            if expand_collections and max_depth > 0:
+                placeholders_list = []
+                for ph_idx, placeholder in self.placeholders.items():
+                    if hasattr(placeholder, "to_dict"):
+                        placeholders_list.append(
+                            {
+                                "placeholder_idx": ph_idx,
+                                "placeholder_data": placeholder.to_dict(
+                                    include_relationships=True,
+                                    max_depth=max_depth - 1,
+                                    include_private=include_private,
+                                    expand_collections=expand_collections,
+                                    format_for_llm=format_for_llm,
+                                    _visited_ids=_visited_ids,
+                                ),
+                            }
+                        )
+                    else:
+                        placeholders_list.append(
+                            {
+                                "placeholder_idx": ph_idx,
+                                "placeholder_data": {
+                                    "_object_type": "Placeholder",
+                                    "_no_introspection": True,
+                                },
+                            }
+                        )
+                props["placeholders"] = placeholders_list
+            elif expand_collections:
+                props["placeholders"] = [
+                    {"placeholder_idx": ph_idx, "_depth_exceeded": True}
+                    for ph_idx in self.placeholders.keys()
+                ]
+            else:
+                props["placeholders"] = {
+                    "_collection_summary": f"{len(self.placeholders)} placeholders"
+                }
+        except Exception as e:
+            props["placeholders"] = self._create_error_context(
+                "placeholders", e, "placeholders collection access failed"
+            )
+
+        return props
+
+    def _to_dict_relationships(
+        self, remaining_depth, expand_collections, _visited_ids, format_for_llm, include_private
+    ):
+        """Override to include slide relationships."""
+        rels = super()._to_dict_relationships(
+            remaining_depth, expand_collections, _visited_ids, format_for_llm, include_private
+        )
+
+        # Slide Layout
+        if self.slide_layout:
+            if hasattr(self.slide_layout, "to_dict"):
+                try:
+                    rels["slide_layout"] = self.slide_layout.to_dict(
+                        max_depth=0,  # Summary only
+                        _visited_ids=_visited_ids,
+                        include_relationships=False,
+                        expand_collections=False,
+                        format_for_llm=format_for_llm,
+                        include_private=include_private,
+                    )
+                except Exception:
+                    rels["slide_layout_ref"] = repr(self.slide_layout)
+            else:
+                rels["slide_layout_ref"] = repr(self.slide_layout)
+
+        # Notes Slide
+        if self.has_notes_slide:
+            try:
+                notes_slide = self.notes_slide
+                if hasattr(notes_slide, "to_dict"):
+                    rels["notes_slide"] = notes_slide.to_dict(
+                        max_depth=remaining_depth - 1 if remaining_depth > 0 else 0,
+                        _visited_ids=_visited_ids,
+                        include_relationships=True,
+                        expand_collections=expand_collections,
+                        format_for_llm=format_for_llm,
+                        include_private=include_private,
+                    )
+                else:
+                    rels["notes_slide_ref"] = repr(notes_slide)
+            except Exception as e:
+                rels["notes_slide_error"] = f"Error accessing notes slide: {str(e)}"
+
+        # Parent Presentation (via part.package.presentation_part.presentation)
+        try:
+            prs = self.part.package.presentation_part.presentation
+            if hasattr(prs, "to_dict"):
+                rels["parent_presentation"] = prs.to_dict(
+                    max_depth=0,  # Summary only
+                    _visited_ids=_visited_ids,
+                    include_relationships=False,
+                    expand_collections=False,
+                    format_for_llm=format_for_llm,
+                    include_private=include_private,
+                )
+            else:
+                rels["parent_presentation_ref"] = repr(prs)
+        except Exception:
+            # Broad except for safety - parent presentation access can fail in various ways
+            pass
+
+        return rels
+
+    def _to_dict_llm_context(
+        self, _visited_ids, max_depth, expand_collections, format_for_llm, include_private
+    ):
+        """Override to provide slide-specific LLM context."""
+        context = super()._to_dict_llm_context(
+            _visited_ids, max_depth, expand_collections, format_for_llm, include_private
+        )
+
+        # Build descriptive context
+        try:
+            # Get title text if available
+            title_text = None
+            title_preview = ""
+            try:
+                if self.shapes.title and self.shapes.title.has_text_frame:
+                    title_text = self.shapes.title.text
+                    if title_text:
+                        title_preview = title_text[:50].replace("\n", " ").replace("\v", " ")
+                        if len(title_text) > 50:
+                            title_preview += "..."
+                        title_preview = f' with title "{title_preview}"'
+            except Exception:
+                pass
+
+            # Get layout name
+            layout_name = "a standard layout"
+            try:
+                if self.slide_layout and self.slide_layout.name:
+                    layout_name = f"layout '{self.slide_layout.name}'"
+            except Exception:
+                pass
+
+            # Build description
+            desc_parts = []
+            slide_identifier = f"Slide ID {self.slide_id}"
+            if self.name:
+                slide_identifier += f" named '{self.name}'"
+            desc_parts.append(f"{slide_identifier}{title_preview}, based on {layout_name}.")
+
+            desc_parts.append(
+                f"Contains {len(self.shapes)} shape(s) including {len(self.placeholders)} placeholder(s)."
+            )
+
+            if self.has_notes_slide:
+                desc_parts.append("Has speaker notes.")
+
+            context["description"] = " ".join(desc_parts)
+            context["summary"] = context["description"]
+
+            context["common_operations"] = [
+                "access shapes (slide.shapes)",
+                "access placeholders (slide.placeholders, slide.shapes.title)",
+                "add shapes (slide.shapes.add_shape(...), etc.)",
+                "access slide layout (slide.slide_layout)",
+                "access/modify notes (slide.notes_slide.notes_text_frame.text = ...)",
+                "get slide properties (slide.slide_id, slide.name, slide.follow_master_background)",
+            ]
+
+        except Exception as e:
+            context["description"] = f"Slide ID {self.slide_id} with introspection error: {str(e)}"
+            context["summary"] = context["description"]
+
+        return context
 
 
 class Slides(ParentedElementProxy):
