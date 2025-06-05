@@ -191,10 +191,22 @@ class TestIntrospectionMixinCore(unittest.TestCase):
         self.assertEqual(result_expanded['properties']['my_dict']['color_key']['_object_type'], "RGBColor")
         self.assertEqual(result_expanded['properties']['my_dict']['color_key']['hex'], "28323C")
 
-        # Test expansion False
+        # Test expansion False - FEP-019: structured collection summaries
         result_not_expanded = dummy.to_dict(expand_collections=False, max_depth=2)
-        self.assertEqual(result_not_expanded['properties']['my_list'], "Collection of 2 items (not expanded due to max_depth or expand_collections=False)")
-        self.assertEqual(result_not_expanded['properties']['my_dict'], "Dictionary with 2 keys (not expanded due to max_depth or expand_collections=False)")
+        
+        # Check list collection summary structure
+        list_summary = result_not_expanded['properties']['my_list']
+        self.assertIn('_collection_summary', list_summary)
+        self.assertEqual(list_summary['_collection_summary']['count'], 2)
+        self.assertEqual(list_summary['_collection_summary']['collection_type'], 'list')
+        self.assertIn('item_type', list_summary['_collection_summary'])  # Type may vary
+        
+        # Check dict collection summary structure  
+        dict_summary = result_not_expanded['properties']['my_dict']
+        self.assertIn('_collection_summary', dict_summary)
+        self.assertEqual(dict_summary['_collection_summary']['count'], 2)
+        self.assertEqual(dict_summary['_collection_summary']['collection_type'], 'dict')
+        self.assertIn('item_type', dict_summary['_collection_summary'])  # Type may vary
 
         # Test depth-limited expansion with complex objects
         from .mock_helpers import DepthTestC
@@ -216,8 +228,12 @@ class TestIntrospectionMixinCore(unittest.TestCase):
 
         # Test that depth limitation stops expansion of complex objects in collections
         result_depth_limited_complex = dummy.to_dict(max_depth=1)
-        self.assertEqual(result_depth_limited_complex['properties']['my_list_complex'],
-                         "Collection of 1 items (not expanded due to max_depth or expand_collections=False)")
+        
+        # FEP-019: Check structured collection summary for depth-limited expansion
+        complex_list_summary = result_depth_limited_complex['properties']['my_list_complex']
+        self.assertIn('_collection_summary', complex_list_summary)
+        self.assertEqual(complex_list_summary['_collection_summary']['count'], 1)
+        self.assertEqual(complex_list_summary['_collection_summary']['collection_type'], 'list')
 
         # Clean up the attribute we added to the instance for this test
         delattr(dummy, "my_list_complex")
