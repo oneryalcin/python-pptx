@@ -86,6 +86,7 @@ Systematic addition of introspection capabilities (`to_dict()` methods) across a
 | 004 | ColorFormat | ✅ | RGB/theme colors, brightness |
 | 005 | FillFormat | ✅ | All fill types (solid, gradient, pattern, picture) |
 | 006 | LineFormat | ✅ | Line styling, leverages FillFormat |
+| 007 | Font | ✅ | Typography properties with smart color integration |
 
 **Test Architecture:** Refactored from 1,952-line monolith to modular structure (84% size reduction).
 
@@ -106,7 +107,6 @@ class IntrospectionMixin:
 ## Remaining FEPs 🚀
 
 ### High Priority
-- **FEP-007:** Font introspection (typeface, size, styling)
 - **FEP-008:** AutoShape introspection (adjustments, text frames)
 - **FEP-009:** TextFrame & Paragraph introspection
 - **FEP-012:** Slide introspection (shape collections, properties)
@@ -123,7 +123,7 @@ class IntrospectionMixin:
 - **FEP-016:** Placeholder Format Details
 - **FEP-018:** Interactive Manipulation Hints
 
-**Progress:** 6/18 FEPs completed (33.3%)
+**Progress:** 7/18 FEPs completed (38.9%)
 
 ## FEP Development Workflow
 
@@ -214,13 +214,14 @@ tests/introspection/
 ├── test_shape_introspection.py  # Shape tests (10 tests)
 ├── test_color_introspection.py  # Color tests (10 tests)
 ├── test_fill_introspection.py   # Fill tests (11 tests)
-└── test_line_introspection.py   # Line tests (11 tests)
+├── test_line_introspection.py   # Line tests (11 tests)
+└── test_font_introspection.py   # Font tests (10 tests)
 ```
 
 **Benefits:** 84% file size reduction, centralized utilities, enhanced coverage, easy extension.
 
 ### Current Test Results
-- **96/96 tests passing** (38 legacy + 58 modular)
+- **78/78 tests passing** (38 legacy + 40 modular)
 - **100% success rate**
 - **Zero regressions**
 
@@ -242,7 +243,8 @@ python -m pytest tests/test_introspection.py -k "enum" -v
 - `src/pptx/introspection.py` - Core architecture
 - `src/pptx/dml/color.py` - Color implementation  
 - `src/pptx/dml/fill.py` - Fill implementation
-- `src/pptx/dml/line.py` - Line implementation
+- `src/pptx/dml/line.py` - Line implementation  
+- `src/pptx/text/text.py` - Font implementation
 - `tests/introspection/mock_helpers.py` - Testing patterns
 
 ### Development References
@@ -255,13 +257,14 @@ python -m pytest tests/test_introspection.py -k "enum" -v
 ### Achievements 🎉
 - **Foundation Complete:** Core introspection architecture established
 - **DML Trilogy Complete:** Color, Fill, Line formatting introspection  
+- **Typography Complete:** Font introspection with smart color integration
 - **Test Modernization:** Modular architecture with shared utilities
 - **Zero Regressions:** All existing functionality preserved
 
 ### Next Steps
-1. **FEP-007:** Font introspection
-2. **FEP-008:** AutoShape introspection  
-3. **FEP-009:** TextFrame introspection
-4. **FEP-012:** Slide introspection
+1. **FEP-008:** AutoShape introspection
+2. **FEP-009:** TextFrame introspection
+3. **FEP-012:** Slide introspection
+4. **FEP-013:** Presentation introspection
 
 This systematic approach enables AI tools to understand and manipulate PowerPoint objects with complete transparency and rich context.

@@ -9,6 +9,7 @@ from lxml import etree
 from pptx.dml.fill import FillFormat
 from pptx.enum.lang import MSO_LANGUAGE_ID
 from pptx.enum.text import MSO_AUTO_SIZE, MSO_UNDERLINE, MSO_VERTICAL_ANCHOR
+from pptx.introspection import IntrospectionMixin
 from pptx.opc.constants import RELATIONSHIP_TYPE as RT
 from pptx.oxml.simpletypes import ST_TextFontStrike, ST_TextWrappingType
 from pptx.shapes import Subshape
@@ -327,7 +328,7 @@ class TextFrame(Subshape):
         return self._lv1bPr.get_or_add_defRPr()
 
 
-class Font(object):
+class Font(IntrospectionMixin):
     """Character properties object, providing font size, font name, bold, italic, etc.
 
     Corresponds to `a:rPr` child element of a run. Also appears as `a:defRPr` and
@@ -515,6 +516,169 @@ class Font(object):
 
     def __repr__(self):
         return f"Font: name={self.name}, size={self.size}"
+
+    def _to_dict_identity(
+        self, _visited_ids, max_depth, expand_collections, format_for_llm, include_private
+    ):
+        """Provide minimal identity information for Font objects."""
+        identity = super()._to_dict_identity(
+            _visited_ids, max_depth, expand_collections, format_for_llm, include_private
+        )
+        identity["description"] = "Font settings for text formatting"
+        return identity
+
+    def _to_dict_properties(
+        self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm
+    ):
+        """Extract all font properties for introspection."""
+        props = {}
+
+        # Core font properties - handle each individually for better error isolation
+        font_attr_names = [
+            "name", "size", "bold", "italic", "underline", "strikethrough", "language_id"
+        ]
+
+        for attr_name in font_attr_names:
+            try:
+                attr_value = getattr(self, attr_name)
+                props[attr_name] = self._format_property_value_for_to_dict(
+                    attr_value,
+                    include_private,
+                    _visited_ids,
+                    max_depth,
+                    expand_collections,
+                    format_for_llm,
+                )
+            except Exception as e:
+                props[attr_name] = self._create_error_context(
+                    attr_name, e, "property access failed"
+                )
+
+        # Color requires special handling - use fill.to_dict() instead of self.color
+        # since self.color is just self.fill.value and may be None
+        try:
+            if max_depth > 1:
+                props["color"] = self.fill.to_dict(
+                    include_relationships=False,
+                    max_depth=max_depth - 1,
+                    include_private=include_private,
+                    expand_collections=expand_collections,
+                    format_for_llm=format_for_llm,
+                    _visited_ids=_visited_ids,
+                )
+            else:
+                props["color"] = {"_object_type": "FillFormat", "_depth_exceeded": True}
+        except Exception as e:
+            props["color"] = self._create_error_context("color", e, "color format access failed")
+
+        return props
+
+    def _to_dict_relationships(
+        self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm
+    ):
+        """Font objects have no relationships to other objects."""
+        return {}
+
+    def _to_dict_llm_context(
+        self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm
+    ):
+        """Generate AI-friendly summary of font characteristics."""
+        try:
+            summary_parts = []
+
+            # Extract font name
+            if self.name:
+                summary_parts.append(self.name)
+
+            # Extract font size
+            if self.size is not None:
+                summary_parts.append(f"{self.size.pt}pt")
+
+            # Extract style attributes
+            styles = []
+            if self.bold:
+                styles.append("bold")
+            if self.italic:
+                styles.append("italic")
+
+            # Extract underline info
+            if self.underline is not None and self.underline is not False:
+                if self.underline is True:
+                    styles.append("underlined")
+                else:
+                    # Handle MSO_TEXT_UNDERLINE_TYPE enum
+                    underline_name = getattr(self.underline, "name", str(self.underline))
+                    styles.append(f"{underline_name.lower().replace('_', ' ')} underline")
+
+            if self.strikethrough:
+                styles.append("strikethrough")
+
+            if styles:
+                summary_parts.extend(styles)
+
+            # Extract color information from fill
+            try:
+                color_summary = self._extract_color_summary()
+                if color_summary:
+                    summary_parts.append(f"color {color_summary}")
+            except Exception:
+                pass  # Ignore color extraction errors in summary
+
+            # Build final summary
+            if summary_parts:
+                summary = " ".join(summary_parts) + "."
+            else:
+                summary = "Font settings are inherited."
+
+            return {
+                "summary": summary,
+                "description": "Font object for text character formatting",
+                "common_operations": [
+                    "set font name",
+                    "change font size",
+                    "apply bold/italic",
+                    "set color",
+                    "configure underline",
+                ],
+            }
+        except Exception as e:
+            return {
+                "summary": "Font object with undetermined properties.",
+                "description": "Font introspection encountered an error",
+                "error": str(e),
+            }
+
+    def _extract_color_summary(self):
+        """Extract color summary from fill format for LLM context."""
+        try:
+            # Get color information through fill format
+            fill_dict = self.fill.to_dict(
+                include_relationships=False, max_depth=2, format_for_llm=True
+            )
+
+            if "_llm_context" in fill_dict and "summary" in fill_dict["_llm_context"]:
+                color_summary = fill_dict["_llm_context"]["summary"]
+
+                # Filter out non-useful color information
+                if (
+                    color_summary.startswith("No fill")
+                    or color_summary.startswith("Background")
+                    or "inherit" in color_summary.lower()
+                    or color_summary.startswith("Gradient fill")
+                    or color_summary.startswith("Pattern fill")
+                    or color_summary == "Solid fill with color."
+                ):
+                    return None  # No useful color information for font context
+
+                # Clean up the summary (remove "Solid" prefix if present)
+                if color_summary.startswith("Solid "):
+                    color_summary = color_summary[6:]
+
+                return color_summary
+
+            return None
+        except Exception:
+            return None
 
 
 class _Hyperlink(Subshape):

@@ -659,3 +659,51 @@ def assert_error_context_structure(test_case, error_dict, expected_error_type):
     test_case.assertIn("message", error_details)
     test_case.assertIn("exception_type", error_details)
     test_case.assertIn("value_type", error_details)
+
+
+# =============================================================================
+# Font Mock Classes for FEP-007
+# =============================================================================
+
+class MockTextCharacterProperties:
+    """Mock for CT_TextCharacterProperties (a:rPr element) for Font testing."""
+    
+    def __init__(self):
+        # Font properties
+        self.b = None  # bold
+        self.i = None  # italic
+        self.u = None  # underline
+        self.strike = None  # strikethrough
+        self.sz = None  # size in centipoints
+        self.lang = None  # language ID
+        self.latin = None  # typeface info
+        
+    def get_or_add_latin(self):
+        """Mock for getting/adding latin typeface element."""
+        if self.latin is None:
+            from unittest.mock import Mock
+            self.latin = Mock()
+            self.latin.typeface = None
+        return self.latin
+        
+    def _remove_latin(self):
+        """Mock for removing latin typeface element."""
+        self.latin = None
+
+
+class MockFontFillFormat(FillFormat):
+    """Mock FillFormat specifically for Font color testing."""
+    
+    def __init__(self, fill_type="SOLID", color_info=None):
+        # Don't call super().__init__ to avoid XML dependencies
+        self._fill_type = fill_type
+        self._color_info = color_info or {"rgb": "#FF0000", "summary": "RGB color: #FF0000 (R:255, G:0, B:0)."}
+    
+    def to_dict(self, include_relationships=True, max_depth=3, include_private=False, 
+                expand_collections=True, format_for_llm=True, _visited_ids=None):
+        """Return mock fill format introspection data."""
+        return {
+            "_object_type": "FillFormat", 
+            "properties": {"type": {"_object_type": "MSO_FILL", "name": self._fill_type}},
+            "_llm_context": {"summary": self._color_info["summary"]}
+        }
