@@ -729,11 +729,12 @@ class _Hyperlink(Subshape):
         self._rPr._remove_hlinkClick()  # pyright: ignore[reportPrivateUsage]
 
 
-class _Paragraph(Subshape):
+class _Paragraph(Subshape, IntrospectionMixin):
     """Paragraph object. Not intended to be constructed directly."""
 
     def __init__(self, p: CT_TextParagraph, parent: ProvidesPart):
         super(_Paragraph, self).__init__(parent)
+        IntrospectionMixin.__init__(self)
         self._element = self._p = p
 
     def add_line_break(self):
@@ -922,6 +923,267 @@ class _Paragraph(Subshape):
             )
             pPr.insert(0, buFont)
         pPr.bullet = value
+
+    def _to_dict_identity(
+        self, _visited_ids, max_depth, expand_collections, format_for_llm, include_private
+    ):
+        """Provide minimal identity information for _Paragraph objects."""
+        identity = super()._to_dict_identity(
+            _visited_ids, max_depth, expand_collections, format_for_llm, include_private
+        )
+        text_preview = self.text[:50] + "..." if len(self.text) > 50 else self.text
+        text_preview = text_preview.replace("\n", " ").replace("\v", " ")
+        identity["description"] = f'Paragraph containing: "{text_preview}"'
+        return identity
+
+    def _to_dict_properties(
+        self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm
+    ):
+        """Extract all paragraph properties for introspection."""
+        props = {}
+
+        # Core text content
+        props["text"] = self.text
+
+        # Paragraph formatting properties
+        paragraph_attr_names = ["alignment", "level"]
+        for attr_name in paragraph_attr_names:
+            try:
+                attr_value = getattr(self, attr_name)
+                props[attr_name] = self._format_property_value_for_to_dict(
+                    attr_value,
+                    include_private,
+                    _visited_ids,
+                    max_depth,
+                    expand_collections,
+                    format_for_llm,
+                )
+            except Exception as e:
+                props[attr_name] = self._create_error_context(
+                    attr_name, e, "property access failed"
+                )
+
+        # Spacing properties - handle individually for better error isolation
+        spacing_attr_names = ["line_spacing", "space_before", "space_after"]
+        for attr_name in spacing_attr_names:
+            try:
+                attr_value = self._get_spacing_property_safely(attr_name)
+                props[attr_name] = self._format_property_value_for_to_dict(
+                    attr_value,
+                    include_private,
+                    _visited_ids,
+                    max_depth,
+                    expand_collections,
+                    format_for_llm,
+                )
+            except Exception as e:
+                props[attr_name] = self._create_error_context(
+                    attr_name, e, "spacing property access failed"
+                )
+
+        # Bullet property
+        try:
+            bullet_value = self._get_bullet_property_safely()
+            props["bullet"] = self._format_property_value_for_to_dict(
+                bullet_value,
+                include_private,
+                _visited_ids,
+                max_depth,
+                expand_collections,
+                format_for_llm,
+            )
+        except Exception as e:
+            props["bullet"] = self._create_error_context(
+                "bullet", e, "bullet property access failed"
+            )
+
+        # Default font (recursive call to FEP-007)
+        try:
+            if max_depth > 1:
+                props["font"] = self.font.to_dict(
+                    include_relationships=False,
+                    max_depth=max_depth - 1,
+                    include_private=include_private,
+                    expand_collections=expand_collections,
+                    format_for_llm=format_for_llm,
+                    _visited_ids=_visited_ids,
+                )
+            else:
+                props["font"] = {"_object_type": "Font", "_depth_exceeded": True}
+        except Exception as e:
+            props["font"] = self._create_error_context("font", e, "font access failed")
+
+        # Runs collection (recursive calls to FEP-009)
+        try:
+            if expand_collections and max_depth > 1:
+                runs_list = []
+                for run in self.runs:
+                    if hasattr(run, "to_dict"):
+                        runs_list.append(
+                            run.to_dict(
+                                include_relationships=False,
+                                max_depth=max_depth - 1,
+                                include_private=include_private,
+                                expand_collections=expand_collections,
+                                format_for_llm=format_for_llm,
+                                _visited_ids=_visited_ids,
+                            )
+                        )
+                    else:
+                        runs_list.append({"_object_type": "_Run", "_no_introspection": True})
+                props["runs"] = runs_list
+            elif expand_collections:
+                props["runs"] = [
+                    {"_object_type": "_Run", "_depth_exceeded": True} for _ in self.runs
+                ]
+            else:
+                props["runs"] = {"_collection_summary": f"{len(self.runs)} runs"}
+        except Exception as e:
+            props["runs"] = self._create_error_context("runs", e, "runs collection access failed")
+
+        return props
+
+    def _to_dict_relationships(
+        self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm
+    ):
+        """Extract relationship information for paragraphs."""
+        rels = {}
+
+        # Parent relationship (text frame)
+        try:
+            if hasattr(self, "_parent") and self._parent is not None:
+                rels["parent"] = {
+                    "_object_type": "TextFrame",
+                    "_description": "Parent text frame containing this paragraph",
+                }
+        except Exception:
+            # Silently ignore parent relationship extraction errors
+            pass
+
+        # Child relationships (runs) - summary only to avoid deep nesting
+        try:
+            if len(self.runs) > 0:
+                rels["runs"] = {
+                    "_collection_summary": f"{len(self.runs)} child runs",
+                    "_description": "Text runs contained in this paragraph",
+                }
+        except Exception:
+            # Silently ignore runs relationship extraction errors
+            pass
+
+        return rels
+
+    def _to_dict_llm_context(
+        self, include_private, _visited_ids, max_depth, expand_collections, format_for_llm
+    ):
+        """Generate AI-friendly summary of paragraph characteristics."""
+        try:
+            # Extract text preview
+            text_preview = self.text[:100].replace("\n", " ").replace("\v", " ")
+            if len(self.text) > 100:
+                text_preview += "..."
+
+            # Build summary parts
+            summary_parts = []
+
+            # Add text content description
+            if text_preview.strip():
+                summary_parts.append(f'Paragraph: "{text_preview}"')
+            else:
+                summary_parts.append("Empty paragraph")
+
+            # Add formatting information
+            formatting_info = []
+
+            # Alignment
+            try:
+                if self.alignment is not None:
+                    alignment_name = getattr(self.alignment, "name", str(self.alignment))
+                    formatting_info.append(f"{alignment_name.lower().replace('_', ' ')} aligned")
+            except Exception:
+                pass
+
+            # Indentation level
+            try:
+                if self.level > 0:
+                    formatting_info.append(f"indent level {self.level}")
+            except Exception:
+                pass
+
+            # Spacing
+            try:
+                spacing_info = []
+                if self.line_spacing is not None:
+                    if isinstance(self.line_spacing, (int, float)):
+                        spacing_info.append(f"{self.line_spacing}x line spacing")
+                    else:
+                        spacing_info.append("custom line spacing")
+
+                if self.space_before is not None:
+                    spacing_info.append("space before")
+
+                if self.space_after is not None:
+                    spacing_info.append("space after")
+
+                if spacing_info:
+                    formatting_info.extend(spacing_info)
+            except Exception:
+                pass
+
+            # Bullet
+            try:
+                if self.bullet is not None:
+                    formatting_info.append("bulleted")
+            except Exception:
+                pass
+
+            if formatting_info:
+                summary_parts.append("with " + ", ".join(formatting_info))
+
+            # Runs information
+            try:
+                runs_count = len(self.runs)
+                if runs_count == 1:
+                    summary_parts.append("(1 text run)")
+                elif runs_count > 1:
+                    summary_parts.append(f"({runs_count} text runs)")
+            except Exception:
+                pass
+
+            summary = " ".join(summary_parts) + "."
+
+            return {
+                "summary": summary,
+                "description": "Paragraph object containing formatted text content",
+                "common_operations": [
+                    "modify text content (paragraph.text = ...)",
+                    "change alignment (paragraph.alignment = ...)",
+                    "set indentation (paragraph.level = ...)",
+                    "adjust spacing (paragraph.line_spacing, space_before, space_after)",
+                    "add/modify runs (paragraph.add_run())",
+                    "format font (paragraph.font.bold = True, etc.)",
+                ],
+            }
+        except Exception as e:
+            return {
+                "summary": f"Paragraph with {len(self.text)} characters.",
+                "description": "Paragraph introspection encountered an error",
+                "error": str(e),
+            }
+
+    def _get_spacing_property_safely(self, property_name):
+        """Safely access spacing properties that may not be available."""
+        try:
+            return getattr(self, property_name)
+        except (NotImplementedError, ValueError, AttributeError):
+            return None
+
+    def _get_bullet_property_safely(self):
+        """Safely access bullet property that may not be available."""
+        try:
+            return self.bullet
+        except (NotImplementedError, ValueError, AttributeError):
+            return None
 
 
 class _Run(Subshape, IntrospectionMixin):

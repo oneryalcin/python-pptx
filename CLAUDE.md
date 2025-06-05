@@ -91,6 +91,7 @@ Systematic addition of introspection capabilities (`to_dict()` methods) across a
 | 006 | LineFormat | ✅ | Line styling, leverages FillFormat |
 | 007 | Font | ✅ | Typography properties with smart color integration |
 | 009 | _Run | ✅ | Text content, font, hyperlink introspection |
+| 010 | _Paragraph | ✅ | Text content, formatting, runs collection, spacing |
 
 **Test Architecture:** Refactored from 1,952-line monolith to modular structure (84% size reduction).
 
@@ -112,22 +113,22 @@ class IntrospectionMixin:
 
 ### High Priority
 - **FEP-008:** AutoShape introspection (adjustments, text frames)
-- **FEP-010:** TextFrame & Paragraph introspection
+- **FEP-011:** TextFrame introspection (paragraph collections, margins)
 - **FEP-012:** Slide introspection (shape collections, properties)
 - **FEP-013:** Presentation introspection
 
 ### Medium Priority  
-- **FEP-011:** Picture & Media introspection
-- **FEP-014:** Table introspection
-- **FEP-015:** Enhanced LLM Context Generation
-- **FEP-016:** Relationship Mapping & Inheritance
-- **FEP-017:** Performance Optimization
+- **FEP-014:** Picture & Media introspection
+- **FEP-015:** Table introspection
+- **FEP-016:** Enhanced LLM Context Generation
+- **FEP-017:** Relationship Mapping & Inheritance
+- **FEP-018:** Performance Optimization
 
 ### Low Priority
-- **FEP-018:** Placeholder Format Details
-- **FEP-019:** Interactive Manipulation Hints
+- **FEP-019:** Placeholder Format Details
+- **FEP-020:** Interactive Manipulation Hints
 
-**Progress:** 8/18 FEPs completed (44.4%)
+**Progress:** 9/19 FEPs completed (47.4%)
 
 ## FEP Development Workflow
 
@@ -207,6 +208,8 @@ except Exception as e:
 3. **Memory Leaks:** Use `_visited_ids` for circular reference detection
 4. **Type Safety:** Check `isinstance()` before accessing type-specific attributes
 5. **Linting Scope:** Only run ruff on files you modified, not entire repo (`ruff check file.py` not `ruff check src/`)
+6. **Staging Discipline:** Only stage files directly related to your FEP (`git add specific_files` not `git add .`)
+7. **Live Testing:** Always include live test scripts in PRs for engineer validation
 
 ## Testing Infrastructure
 
@@ -220,13 +223,15 @@ tests/introspection/
 ├── test_color_introspection.py  # Color tests (10 tests)
 ├── test_fill_introspection.py   # Fill tests (11 tests)
 ├── test_line_introspection.py   # Line tests (11 tests)
-└── test_font_introspection.py   # Font tests (10 tests)
+├── test_font_introspection.py   # Font tests (10 tests)
+├── test_run_introspection.py    # Run tests (15 tests)
+└── test_paragraph_introspection.py # Paragraph tests (20 tests)
 ```
 
 **Benefits:** 84% file size reduction, centralized utilities, enhanced coverage, easy extension.
 
 ### Current Test Results
-- **78/78 tests passing** (38 legacy + 40 modular)
+- **124/124 tests passing** (9 modular modules + legacy coverage)
 - **100% success rate**
 - **Zero regressions**
 
@@ -240,6 +245,31 @@ python -m pytest tests/introspection/test_color_introspection.py -v
 
 # Legacy validation
 python -m pytest tests/test_introspection.py -k "enum" -v
+```
+
+### 6. PR Best Practices
+
+#### Essential PR Components
+1. **Live Test Script:** Always include executable validation script for engineers
+2. **Comprehensive Description:** Feature summary, implementation details, test results  
+3. **Clear Instructions:** Step-by-step testing commands for reviewers
+4. **Staged Changes:** Only commit files directly related to your FEP
+5. **Test Evidence:** Include test pass/fail counts and any pre-existing failures
+
+#### PR Description Template
+```markdown
+## Summary
+Brief description of FEP implementation and key features.
+
+## Test Plan
+### For Reviewers
+```bash
+# Commands for engineers to validate
+```
+
+### Expected Results
+- Test counts and expected outcomes
+- Notes on any pre-existing failures
 ```
 
 ## Learning Resources
@@ -262,13 +292,14 @@ python -m pytest tests/test_introspection.py -k "enum" -v
 ### Achievements 🎉
 - **Foundation Complete:** Core introspection architecture established
 - **DML Trilogy Complete:** Color, Fill, Line formatting introspection  
-- **Typography Complete:** Font introspection with smart color integration
+- **Typography Complete:** Font and paragraph introspection with smart relationships
+- **Text Hierarchy Complete:** Run and paragraph introspection with collection management
 - **Test Modernization:** Modular architecture with shared utilities
 - **Zero Regressions:** All existing functionality preserved
 
 ### Next Steps
 1. **FEP-008:** AutoShape introspection
-2. **FEP-009:** TextFrame introspection
+2. **FEP-011:** TextFrame introspection  
 3. **FEP-012:** Slide introspection
 4. **FEP-013:** Presentation introspection
 
