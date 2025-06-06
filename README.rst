@@ -47,7 +47,7 @@ More information is available in the `python-pptx documentation`_.
 **For AI Agent Integration:**
 
 1. **Review the Roadmaps**: See `ROADMAP.md`_ (FEPs) and `ROADMAP_MEP.md`_ (MEPs) for current capabilities
-2. **Install MCP Dependencies**: ``pip install -r requirements-dev.txt``
+2. **Install MCP Dependencies**: ``pip install -r requirements-mcp.txt``
 3. **Configure Your AI Client**: See MCP setup below
 
 **🔍 Enhanced Introspection (FEPs)**
@@ -76,7 +76,7 @@ More information is available in the `python-pptx documentation`_.
 
 .. code-block:: bash
 
-    pip install -r requirements-dev.txt
+    pip install -r requirements-mcp.txt
 
 **Claude Desktop Configuration:**
 

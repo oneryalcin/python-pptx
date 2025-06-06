@@ -9,8 +9,11 @@ AI assistant guide for developing MCP (Model Context Protocol) servers for the p
 # Project has existing venv - ALWAYS activate first
 source venv/bin/activate
 
-# Install MCP dependencies (already in requirements-dev.txt)
+# Install MCP dependencies
 pip install -e .
+pip install -r requirements-mcp.txt
+
+# For development (includes MCP + dev tools)
 pip install -r requirements-dev.txt
 
 # Verify MCP installation
