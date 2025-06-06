@@ -2,7 +2,12 @@
 MCP server for python-pptx agentic toolkit.
 
 This server provides AI agents with access to python-pptx library capabilities
-through the Model Context Protocol (MCP).
+through the Model Context Protocol (MCP). Implements MEP-003: Root and Resource Management.
+
+Features:
+- Automatic presentation loading from client roots
+- Resource discovery and tree-based content reading
+- Simplified execute_python_code tool (no file_path required)
 """
 
 import contextlib
@@ -10,8 +15,11 @@ import io
 import json
 import time
 from pathlib import Path
+from typing import List, Optional
+from urllib.parse import urlparse
 
 from mcp.server import FastMCP
+from mcp import types
 
 try:
     import pptx
@@ -23,6 +31,60 @@ mcp = FastMCP("pptx-agent-server")
 
 # Define the path to the info document
 _INFO_DOC_PATH = Path(__file__).parent.parent / "llm_info.md"
+
+# Global state for root management and loaded presentation
+_client_roots: List[types.Root] = []
+_loaded_presentation: Optional[pptx.Presentation] = None
+_loaded_presentation_path: Optional[Path] = None
+
+
+def _set_client_roots(roots: List[types.Root]) -> None:
+    """Store the client-provided roots and attempt to load a presentation."""
+    global _client_roots, _loaded_presentation, _loaded_presentation_path
+    
+    _client_roots = roots
+    _loaded_presentation = None
+    _loaded_presentation_path = None
+    
+    # Scan roots for .pptx files and load the first one found
+    for root in roots:
+        try:
+            # Parse the root URI to get the file path
+            parsed = urlparse(root.uri)
+            if parsed.scheme == 'file':
+                root_path = Path(parsed.path)
+                if root_path.exists():
+                    # Search for .pptx files in this root
+                    if root_path.is_file() and root_path.suffix.lower() == '.pptx':
+                        # Root points directly to a .pptx file
+                        _load_presentation(root_path)
+                        break
+                    elif root_path.is_dir():
+                        # Search directory for .pptx files
+                        pptx_files = list(root_path.glob('*.pptx'))
+                        if pptx_files:
+                            _load_presentation(pptx_files[0])
+                            break
+        except Exception:
+            # Skip invalid roots
+            continue
+
+
+def _load_presentation(file_path: Path) -> bool:
+    """Load a presentation from the given file path."""
+    global _loaded_presentation, _loaded_presentation_path
+    
+    if pptx is None:
+        return False
+        
+    try:
+        _loaded_presentation = pptx.Presentation(file_path)
+        _loaded_presentation_path = file_path
+        return True
+    except Exception:
+        _loaded_presentation = None
+        _loaded_presentation_path = None
+        return False
 
 
 @mcp.tool()
@@ -57,17 +119,16 @@ async def get_info() -> str:
 
 
 @mcp.tool()
-async def execute_python_code(code: str, file_path: str) -> str:
+async def execute_python_code(code: str) -> str:
     """
-    Execute Python code with a loaded PowerPoint presentation available as 'prs'.
+    Execute Python code with the currently loaded PowerPoint presentation available as 'prs'.
     
-    Loads the specified PowerPoint file and executes the provided Python code
-    with the presentation object available as 'prs' in the execution context.
+    The presentation is automatically loaded from the client-provided roots. The loaded
+    presentation object is available as 'prs' in the execution context.
     Captures stdout, stderr, and any exceptions during execution.
     
     Args:
         code: Python code to execute
-        file_path: Path to PowerPoint file to load (.pptx)
         
     Returns:
         JSON string with execution results including stdout, stderr, and any errors
@@ -84,59 +145,18 @@ async def execute_python_code(code: str, file_path: str) -> str:
             "execution_time": time.time() - start_time
         })
     
-    # Validate and sanitize file path
-    try:
-        file_path_obj = Path(file_path).resolve()
-        
-        # Basic security checks
-        if not file_path_obj.exists():
-            return json.dumps({
-                "success": False,
-                "stdout": "",
-                "stderr": "",
-                "error": f"File not found: {file_path}",
-                "execution_time": time.time() - start_time
-            })
-            
-        if not file_path_obj.suffix.lower() == '.pptx':
-            return json.dumps({
-                "success": False,
-                "stdout": "",
-                "stderr": "",
-                "error": f"Invalid file type. Expected .pptx, got: {file_path_obj.suffix}",
-                "execution_time": time.time() - start_time
-            })
-            
-        # Check for path traversal attempts
-        if '..' in str(file_path_obj):
-            return json.dumps({
-                "success": False,
-                "stdout": "",
-                "stderr": "",
-                "error": "Invalid file path: path traversal not allowed",
-                "execution_time": time.time() - start_time
-            })
-            
-    except Exception as e:
+    # Check if a presentation is loaded
+    if _loaded_presentation is None:
         return json.dumps({
             "success": False,
             "stdout": "",
             "stderr": "",
-            "error": f"File path validation error: {str(e)}",
+            "error": "No PowerPoint presentation loaded. Ensure a .pptx file is available in the client roots.",
             "execution_time": time.time() - start_time
         })
     
-    # Load presentation
-    try:
-        prs = pptx.Presentation(file_path_obj)
-    except Exception as e:
-        return json.dumps({
-            "success": False,
-            "stdout": "",
-            "stderr": "",
-            "error": f"Failed to load presentation: {str(e)}",
-            "execution_time": time.time() - start_time
-        })
+    # Use the pre-loaded presentation
+    prs = _loaded_presentation
     
     # Prepare execution context
     exec_globals = {
@@ -145,6 +165,7 @@ async def execute_python_code(code: str, file_path: str) -> str:
         "pptx": pptx,  # Make pptx module available too
         "Path": Path,   # Useful for file operations
         "print": print, # Ensure print works
+        "json": json,   # Make json available for output formatting
     }
     
     # Capture stdout and stderr
@@ -182,6 +203,40 @@ async def execute_python_code(code: str, file_path: str) -> str:
             "error": f"Runtime error: {str(e)}",
             "execution_time": time.time() - start_time
         })
+
+
+@mcp.resource("pptx://presentation")
+async def get_presentation_tree() -> str:
+    """Get the tree structure of the currently loaded PowerPoint presentation."""
+    if _loaded_presentation is None or _loaded_presentation_path is None:
+        return json.dumps({
+            "error": "No presentation loaded",
+            "message": "Ensure a .pptx file is available in the client roots."
+        }, indent=2)
+    
+    # Return get_tree() output if available, otherwise return basic info
+    try:
+        if hasattr(_loaded_presentation, 'get_tree'):
+            tree_data = _loaded_presentation.get_tree()
+            return json.dumps(tree_data, indent=2)
+        else:
+            # Fallback: basic presentation info
+            info = {
+                "type": "presentation",
+                "slide_count": len(_loaded_presentation.slides),
+                "file_path": str(_loaded_presentation_path),
+                "note": "get_tree() method not available. Please ensure you have the latest python-pptx with introspection features."
+            }
+            return json.dumps(info, indent=2)
+    except Exception as e:
+        # If get_tree() fails, return error info
+        error_info = {
+            "type": "presentation", 
+            "slide_count": len(_loaded_presentation.slides),
+            "file_path": str(_loaded_presentation_path),
+            "error": f"Failed to get tree data: {str(e)}"
+        }
+        return json.dumps(error_info, indent=2)
 
 
 if __name__ == "__main__":
