@@ -1,0 +1,24 @@
+[06/06/25 12:34:07] INFO     Processing request of type            server.py:558
+                             ListToolsRequest                                   
+[06/06/25 12:34:07] INFO     Processing request of type            server.py:558
+                             CallToolRequest                                    
+[06/06/25 12:34:08] INFO     Processing request of type            server.py:558
+                             CallToolRequest                                    
+Starting MEP-001 MCP Server Live Tests
+==================================================
+[PASS] Server Startup
+        Details: Server started and accepted initialize request
+[PASS] Tool Discovery
+        Details: Found get_info tool with correct description. Tools: ['get_info']
+[PASS] Get Info Execution
+        Details: Tool returned content with all expected markers (1760 chars)
+[PASS] Error Handling
+        Details: Server gracefully handled missing file
+\n==================================================
+MEP-001 MCP Server Test Summary
+==================================================
+Total Tests: 4
+Passed: 4
+Failed: 0
+Success Rate: 100.0%
+\n🎉 All tests passed! MEP-001 implementation is working correctly.
