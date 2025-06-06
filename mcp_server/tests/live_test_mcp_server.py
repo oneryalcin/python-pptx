@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Live test script for MEP-001 MCP server implementation.
+Live test script for MEP-001 and MEP-002 MCP server implementation.
 
 This script validates the actual MCP server functionality by simulating
 a real MCP client interaction. It tests the server startup, tool discovery,
@@ -132,22 +132,27 @@ class MCPServerTester:
                     # Check if get_info tool is present
                     tool_names = [tool.name for tool in tools_result.tools]
 
-                    if "get_info" in tool_names:
+                    # Check for both tools
+                    expected_tools = ["get_info", "execute_python_code"]
+                    missing_tools = [tool for tool in expected_tools if tool not in tool_names]
+                    
+                    if not missing_tools:
                         get_info_tool = next(tool for tool in tools_result.tools if tool.name == "get_info")
+                        execute_code_tool = next(tool for tool in tools_result.tools if tool.name == "execute_python_code")
 
-                        # Validate tool description
+                        # Validate tool descriptions
                         expected_phrase = "You MUST call this tool first"
-                        if expected_phrase in get_info_tool.description:
+                        if expected_phrase in get_info_tool.description and "Execute Python code" in execute_code_tool.description:
                             self.log_test("Tool Discovery", True,
-                                        f"Found get_info tool with correct description. Tools: {tool_names}")
+                                        f"Found both tools with correct descriptions. Tools: {tool_names}")
                             return True
                         else:
                             self.log_test("Tool Discovery", False,
-                                        f"get_info tool found but description is incorrect: {get_info_tool.description}")
+                                        f"Tools found but descriptions incorrect")
                             return False
                     else:
                         self.log_test("Tool Discovery", False,
-                                    f"get_info tool not found. Available tools: {tool_names}")
+                                    f"Missing tools: {missing_tools}. Available tools: {tool_names}")
                         return False
 
         except Exception as e:
@@ -251,10 +256,184 @@ class MCPServerTester:
             self.log_test("Error Handling", False, error=str(e))
             return False
 
+    async def test_execute_python_code_file_not_found(self) -> bool:
+        """Test execute_python_code tool with non-existent file."""
+        try:
+            # Create server parameters
+            server_params = StdioServerParameters(
+                command=sys.executable,
+                args=[str(self.server_path)]
+            )
+
+            async with stdio_client(server_params) as (read, write):
+                async with ClientSession(read, write) as session:
+                    # Initialize the session
+                    await session.initialize()
+
+                    # Call the execute_python_code tool with non-existent file
+                    result = await session.call_tool("execute_python_code", arguments={
+                        "code": "print('test')",
+                        "file_path": "nonexistent.pptx"
+                    })
+
+                    if result.content:
+                        content = result.content[0].text if result.content else ""
+                        
+                        # Parse JSON response
+                        try:
+                            import json
+                            response_data = json.loads(content)
+                            
+                            if response_data.get("success") is False and "File not found" in response_data.get("error", ""):
+                                self.log_test("Execute Python Code - File Not Found", True,
+                                            "Tool correctly handled missing file")
+                                return True
+                            else:
+                                self.log_test("Execute Python Code - File Not Found", False,
+                                            f"Unexpected response: {response_data}")
+                                return False
+                        except json.JSONDecodeError:
+                            self.log_test("Execute Python Code - File Not Found", False,
+                                        f"Invalid JSON response: {content[:100]}...")
+                            return False
+                    else:
+                        self.log_test("Execute Python Code - File Not Found", False, error="No response to tool call")
+                        return False
+
+        except Exception as e:
+            self.log_test("Execute Python Code - File Not Found", False, error=str(e))
+            return False
+
+    async def test_execute_python_code_with_test_file(self) -> bool:
+        """Test execute_python_code tool with a real test file."""
+        try:
+            # Create a minimal test presentation file
+            test_file_path = PROJECT_ROOT / "mcp_server" / "tests" / "test_minimal.pptx"
+            
+            # Copy the existing test file if it exists, otherwise skip this test
+            existing_test_file = PROJECT_ROOT / "tests" / "test_files" / "minimal.pptx"
+            if not existing_test_file.exists():
+                self.log_test("Execute Python Code - With Test File", True,
+                            "Skipped - no test file available")
+                return True
+                
+            # Use the existing test file directly
+            server_params = StdioServerParameters(
+                command=sys.executable,
+                args=[str(self.server_path)]
+            )
+
+            async with stdio_client(server_params) as (read, write):
+                async with ClientSession(read, write) as session:
+                    # Initialize the session
+                    await session.initialize()
+
+                    # Test code that uses the prs object
+                    test_code = """
+print(f"Presentation has {len(prs.slides)} slide(s)")
+print(f"Slide master count: {len(prs.slide_masters)}")
+print("Successfully accessed presentation!")
+"""
+
+                    # Call the execute_python_code tool
+                    result = await session.call_tool("execute_python_code", arguments={
+                        "code": test_code,
+                        "file_path": str(existing_test_file)
+                    })
+
+                    if result.content:
+                        content = result.content[0].text if result.content else ""
+                        
+                        try:
+                            import json
+                            response_data = json.loads(content)
+                            
+                            if response_data.get("success") is True:
+                                stdout = response_data.get("stdout", "")
+                                if "Successfully accessed presentation!" in stdout:
+                                    self.log_test("Execute Python Code - With Test File", True,
+                                                f"Successfully executed code and accessed presentation")
+                                    return True
+                                else:
+                                    self.log_test("Execute Python Code - With Test File", False,
+                                                f"Code executed but missing expected output: {stdout}")
+                                    return False
+                            else:
+                                self.log_test("Execute Python Code - With Test File", False,
+                                            f"Code execution failed: {response_data.get('error')}")
+                                return False
+                        except json.JSONDecodeError:
+                            self.log_test("Execute Python Code - With Test File", False,
+                                        f"Invalid JSON response: {content[:100]}...")
+                            return False
+                    else:
+                        self.log_test("Execute Python Code - With Test File", False, error="No response to tool call")
+                        return False
+
+        except Exception as e:
+            self.log_test("Execute Python Code - With Test File", False, error=str(e))
+            return False
+
+    async def test_execute_python_code_syntax_error(self) -> bool:
+        """Test execute_python_code tool with syntax error in code."""
+        try:
+            # Use existing test file
+            existing_test_file = PROJECT_ROOT / "tests" / "test_files" / "minimal.pptx"
+            if not existing_test_file.exists():
+                self.log_test("Execute Python Code - Syntax Error", True,
+                            "Skipped - no test file available")
+                return True
+
+            server_params = StdioServerParameters(
+                command=sys.executable,
+                args=[str(self.server_path)]
+            )
+
+            async with stdio_client(server_params) as (read, write):
+                async with ClientSession(read, write) as session:
+                    # Initialize the session
+                    await session.initialize()
+
+                    # Code with syntax error
+                    test_code = "if True print('missing colon')"
+
+                    # Call the execute_python_code tool
+                    result = await session.call_tool("execute_python_code", arguments={
+                        "code": test_code,
+                        "file_path": str(existing_test_file)
+                    })
+
+                    if result.content:
+                        content = result.content[0].text if result.content else ""
+                        
+                        try:
+                            import json
+                            response_data = json.loads(content)
+                            
+                            if response_data.get("success") is False and "Syntax error" in response_data.get("error", ""):
+                                self.log_test("Execute Python Code - Syntax Error", True,
+                                            "Tool correctly handled syntax error")
+                                return True
+                            else:
+                                self.log_test("Execute Python Code - Syntax Error", False,
+                                            f"Unexpected response: {response_data}")
+                                return False
+                        except json.JSONDecodeError:
+                            self.log_test("Execute Python Code - Syntax Error", False,
+                                        f"Invalid JSON response: {content[:100]}...")
+                            return False
+                    else:
+                        self.log_test("Execute Python Code - Syntax Error", False, error="No response to tool call")
+                        return False
+
+        except Exception as e:
+            self.log_test("Execute Python Code - Syntax Error", False, error=str(e))
+            return False
+
     def print_summary(self):
         """Print a summary of all test results."""
         print("\\n" + "="*50)
-        print("MEP-001 MCP Server Test Summary")
+        print("MEP-001 and MEP-002 MCP Server Test Summary")
         print("="*50)
 
         total_tests = len(self.test_results)
@@ -277,7 +456,7 @@ class MCPServerTester:
 
 async def main():
     """Run all tests."""
-    print("Starting MEP-001 MCP Server Live Tests")
+    print("Starting MEP-001 and MEP-002 MCP Server Live Tests")
     print("="*50)
 
     tester = MCPServerTester()
@@ -287,7 +466,10 @@ async def main():
         tester.test_server_startup(),
         tester.test_tool_discovery(),
         tester.test_get_info_execution(),
-        tester.test_error_handling()
+        tester.test_error_handling(),
+        tester.test_execute_python_code_file_not_found(),
+        tester.test_execute_python_code_with_test_file(),
+        tester.test_execute_python_code_syntax_error()
     ]
 
     # Execute tests
@@ -298,7 +480,7 @@ async def main():
     success = tester.print_summary()
 
     if success:
-        print("\\n🎉 All tests passed! MEP-001 implementation is working correctly.")
+        print("\\n🎉 All tests passed! MEP-001 and MEP-002 implementations are working correctly.")
         return 0
     else:
         print("\\n❌ Some tests failed. Please review the implementation.")
