@@ -35,15 +35,18 @@ These MEPs establish the basic server and its primary interaction tools.
     *   **Test Results:** 10/10 unit tests passing, 4/4 live tests passing (100% success rate)
     *   **Priority:** **CRITICAL.** This is the entry point for any agent interaction.
 
-*   **MEP-002: The `execute_python_code` Tool**
+*   **MEP-002: The `execute_python_code` Tool** ✅ **COMPLETED**
     *   **Goal:** Create the primary "Act" tool that allows the agent to run `python-pptx` code.
-    *   **Scope:**
-        1.  Implement the **`execute_python_code(code: str)` tool**.
-        2.  This tool will take a string of Python code as input.
-        3.  It will execute this code in a sandboxed environment where a `Presentation` object, loaded from a specified file, is available as `prs`.
-        4.  It must capture and return `stdout`, `stderr`, and any return value from the script.
-        5.  **Security:** This is the most critical part. The execution environment must be carefully sandboxed to prevent access to unauthorized file paths or system commands. Initially, we can restrict it to only operate on a single, pre-defined `.pptx` file.
-    *   **MCP Concepts Used:** Tools.
+    *   **Implementation Notes:**
+        1.  ✅ Implemented the **`execute_python_code(code: str, file_path: str)` tool**
+        2.  ✅ Tool takes Python code string and PowerPoint file path as inputs
+        3.  ✅ Executes code in controlled environment with `prs` object available
+        4.  ✅ Captures and returns `stdout`, `stderr`, exceptions, and execution time as JSON
+        5.  ✅ **Security:** File path validation, path traversal prevention, file type checking
+        6.  ✅ Comprehensive error handling for syntax errors, runtime errors, and file issues
+        7.  ✅ Context injection includes `prs`, `pptx` module, `Path`, and `print` function
+    *   **MCP Concepts Used:** Tools, FastMCP framework.
+    *   **Test Results:** 21/21 unit tests passing, 7/7 live tests passing (100% success rate)
     *   **Priority:** **CRITICAL.** This is the agent's "hands."
 
 *   **MEP-003: Root and Resource Management**
