@@ -119,6 +119,10 @@ python mcp_server/tests/live_test_mcp_server.py
 
 # Both contexts
 source venv/bin/activate && pip install -e . && pip install -r requirements-dev.txt
+
+# PR Code Review
+# Fetch and display all PR comments in readable format (replace PR_NUMBER)
+gh api repos/oneryalcin/python-pptx/pulls/PR_NUMBER/comments --paginate | jq -r '.[] | "File: \(.path), Line: \(.original_line // .line // "N/A"), Comment: \(.body)"'
 ```
 
 ---
