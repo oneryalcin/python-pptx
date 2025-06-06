@@ -1,0 +1,127 @@
+🚀 Starting Live Tests for Presentation.to_dict() - FEP-013
+================================================================================
+
+============================================================
+Test 1: Basic Presentation Introspection
+============================================================
+✅ Basic to_dict() successful
+✅ Required top-level keys present
+✅ Identity information correct
+✅ Core properties extracted correctly
+✅ Slide dimensions formatted correctly
+✅ Collections correctly collapsed
+✅ LLM context generated correctly
+📊 Sample core properties:
+{
+  "author": "FEP Test Suite",
+  "category": "",
+  "comments": "Created for validating FEP-013 implementation",
+  "content_status": "",
+  "created": "2013-01-27T09:14:16",
+  "identifier": "",
+  "keywords": "",
+  "language": "",
+  "last_modified_by": "Steve Canny",
+... (7 more lines)
+✅ Test 1 PASSED
+
+============================================================
+Test 2: Presentation with Multiple Slides
+============================================================
+✅ to_dict() with expanded collections successful
+✅ Found 3 slides in expanded collection
+✅ All slides have proper to_dict structure
+✅ Found 1 slide masters
+✅ LLM context reflects correct slide count
+📊 Sample slide summary:
+{
+  "class_name": "Slide",
+  "memory_address": "0x102900d70",
+  "description": "Represents slide ID 256.",
+  "slide_id": 256
+... (1 more lines)
+✅ Test 2 PASSED
+
+============================================================
+Test 3: Presentation Relationships
+============================================================
+✅ to_dict() with relationships successful
+✅ Key relationships present
+✅ Relationship part names correct
+📊 Relationships:
+{
+  "main_document_part": {
+    "partname": "/ppt/presentation.xml"
+  },
+  "core_properties_part": {
+    "partname": "/docProps/core.xml"
+  }
+}
+✅ Test 3 PASSED
+
+============================================================
+Test 4: Notes Master Handling
+============================================================
+✅ to_dict() with notes master successful
+✅ Notes master represented correctly
+✅ LLM context includes notes master
+📊 Notes master summary:
+{
+  "_object_type": "NotesMaster",
+  "_summary_or_truncated": true,
+  "name": ""
+}
+✅ Test 4 PASSED
+
+============================================================
+Test 5: Max Depth Control
+============================================================
+✅ to_dict() with max_depth=0 successful
+✅ max_depth=0 truncates entire object
+✅ max_depth=1 allows controlled expansion
+✅ max_depth=3 allows full expansion
+📊 Depth comparison - object at depth 0: dict with _truncated key
+📊 Depth comparison - slides at depth 1: list
+📊 Depth comparison - slides at depth 3: list
+✅ Test 5 PASSED
+
+============================================================
+Test 6: LLM Context Generation
+============================================================
+✅ to_dict() with format_for_llm=True successful
+✅ LLM description contains all expected elements
+✅ Common operations include all expected actions
+📊 Full LLM context:
+{
+  "description": "Presentation: 'Comprehensive LLM Test Presentation'. Contains 5 slide(s) and 1 slide master(s). Slide dimensions: 11.00\"W x 8.50\"H. Includes a notes master.",
+  "summary": "Presentation: 'Comprehensive LLM Test Presentation'. Contains 5 slide(s) and 1 slide master(s). Slide dimensions: 11.00\"W x 8.50\"H. Includes a notes master.",
+  "common_operations": [
+    "access slides (prs.slides)",
+    "add a slide (prs.slides.add_slide(...))",
+    "access slide masters (prs.slide_masters, prs.slide_master)",
+    "access notes master (prs.notes_master)",
+    "modify core properties (prs.core_properties.title = ...)",
+    "change slide dimensions (prs.slide_width = Inches(...))",
+    "save presentation (prs.save(...))"
+  ]
+}
+✅ Test 6 PASSED
+
+============================================================
+Test 7: Error Handling and Edge Cases
+============================================================
+✅ format_for_llm=False excludes LLM context
+✅ No unexpected private fields included
+✅ Handles empty presentation correctly
+✅ Large max_depth handled gracefully
+✅ All error handling tests passed
+✅ Test 7 PASSED
+
+============================================================
+FINAL RESULTS
+============================================================
+✅ PASSED: 7
+❌ FAILED: 0
+📊 SUCCESS RATE: 7/7 (100.0%)
+
+🎉 ALL TESTS PASSED! FEP-013 implementation is working correctly.

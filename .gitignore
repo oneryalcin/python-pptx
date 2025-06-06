@@ -11,3 +11,5 @@ _scratch/
 /spec/gen_spec/spec*.db
 tags
 /tests/debug.py
+/mcp_server/mcp-llm.txt
+/mcp_server/mcp-llm-annotated.txt

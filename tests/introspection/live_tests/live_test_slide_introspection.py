@@ -292,7 +292,7 @@ def test_slide_depth_limits():
                 if isinstance(shapes_data, list) and shapes_data:
                     first_shape = shapes_data[0]
                     if "_depth_exceeded" in first_shape:
-                        print(f"Shapes: depth exceeded (as expected)")
+                        print("Shapes: depth exceeded (as expected)")
                     else:
                         print(f"Shapes: expanded with keys {list(first_shape.keys())}")
                 else:
