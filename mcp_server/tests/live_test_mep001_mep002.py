@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
 """
-Live test script for MEP-001 and MEP-002 MCP server implementation.
+Live test script for MEP-001 and MEP-002: Server Bootstrap & Tools.
 
-This script validates the actual MCP server functionality by simulating
-a real MCP client interaction. It tests the server startup, tool discovery,
-and tool execution in a real environment.
+This script validates end-to-end MCP protocol functionality for:
+- MEP-001: Server startup, initialization, and get_info tool
+- MEP-002: execute_python_code tool (Note: Uses old signature, expects failures with MEP-003)
 
 Usage:
-    python mcp/tests/live_test_mcp_server.py
+    python live_test_mep001_mep002.py
 
 Requirements:
     - Virtual environment must be activated
     - MCP dependencies must be installed
+    
+Note: Some tests will fail with MEP-003 due to execute_python_code signature change.
 """
 
 import asyncio

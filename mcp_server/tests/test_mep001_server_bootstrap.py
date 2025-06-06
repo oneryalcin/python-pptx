@@ -1,6 +1,8 @@
 """
-Unit tests for the MEP-002 (original) MCP server implementation.
-These tests are preserved to ensure backward compatibility understanding.
+Unit tests for MEP-001: Server Bootstrap & get_info Tool.
+
+Tests the core MCP server initialization and the get_info tool functionality.
+This covers the foundational server setup implemented in MEP-001.
 """
 
 import asyncio

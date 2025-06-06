@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-Unit tests for MEP-003: Root and Resource Management implementation.
+Unit tests for MEP-003: Root and Resource Management.
 
-Tests the new functionality added to the MCP server including:
-- Root handling and presentation auto-loading
-- Simplified execute_python_code tool (no file_path parameter)
-- Resource list and read functionality
+Tests the root handling, automatic presentation loading, and resource management
+functionality introduced in MEP-003. This includes:
+- Client root scanning and presentation auto-loading
+- Resource discovery and tree-based content reading  
+- Integration with MCP resource model
 """
 
 import json

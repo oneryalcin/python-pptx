@@ -1,6 +1,8 @@
 """
-Legacy unit tests for the execute_python_code tool with MEP-002 signature.
-These tests validate that the tool behavior is correct for the updated MEP-003 implementation.
+Unit tests for MEP-002: execute_python_code Tool (Updated for MEP-003).
+
+Tests the execute_python_code tool functionality with the updated signature
+that uses pre-loaded presentations from client roots instead of file_path parameter.
 """
 
 import json
