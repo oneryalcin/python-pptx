@@ -3,3 +3,8 @@ build
 ruff
 setuptools>=61.0.0
 twine
+
+# MCP server dependencies
+mcp
+httpx
+python-dotenv
