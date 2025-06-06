@@ -8,14 +8,18 @@ Features:
 - Automatic presentation loading from client roots
 - Resource discovery and tree-based content reading
 - Simplified execute_python_code tool (no file_path required)
+- Session-based state management for multi-client support
 """
 
 import contextlib
 import io
 import json
+import threading
 import time
+import uuid
+from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 from urllib.parse import urlparse
 
 from mcp.server import FastMCP
@@ -32,19 +36,108 @@ mcp = FastMCP("pptx-agent-server")
 # Define the path to the info document
 _INFO_DOC_PATH = Path(__file__).parent.parent / "llm_info.md"
 
-# Global state for root management and loaded presentation
-_client_roots: List[types.Root] = []
-_loaded_presentation: Optional[pptx.Presentation] = None
-_loaded_presentation_path: Optional[Path] = None
+
+@dataclass
+class SessionContext:
+    """Represents a client session with its state."""
+    session_id: str
+    created_at: float
+    last_accessed: float
+    client_roots: List[types.Root]
+    loaded_presentation: Optional[pptx.Presentation] = None
+    loaded_presentation_path: Optional[Path] = None
+    
+    def update_access(self):
+        """Update the last accessed timestamp."""
+        self.last_accessed = time.time()
+    
+    def load_presentation(self, file_path: Path) -> bool:
+        """Load a presentation from the given file path."""
+        if pptx is None:
+            return False
+            
+        try:
+            self.loaded_presentation = pptx.Presentation(file_path)
+            self.loaded_presentation_path = file_path
+            return True
+        except Exception:
+            self.loaded_presentation = None
+            self.loaded_presentation_path = None
+            return False
+
+
+# Session management
+_session_store: Dict[str, SessionContext] = {}
+_session_lock = threading.Lock()
+_current_session_id = threading.local()
+
+
+def _get_session_id() -> str:
+    """
+    Get the current session ID. Since FastMCP doesn't provide explicit session context,
+    we use a thread-local approach. For now, we create a default session per thread.
+    This is a temporary solution until we can implement proper session handling.
+    """
+    if not hasattr(_current_session_id, 'value'):
+        # Create a new session for this thread
+        session_id = str(uuid.uuid4())
+        _current_session_id.value = session_id
+        
+        with _session_lock:
+            if session_id not in _session_store:
+                _session_store[session_id] = SessionContext(
+                    session_id=session_id,
+                    created_at=time.time(),
+                    last_accessed=time.time(),
+                    client_roots=[]
+                )
+    
+    return _current_session_id.value
+
+
+def _get_session() -> SessionContext:
+    """Get the current session context."""
+    session_id = _get_session_id()
+    
+    with _session_lock:
+        session = _session_store.get(session_id)
+        if session:
+            session.update_access()
+            return session
+        else:
+            # This shouldn't happen, but create a new session if needed
+            session = SessionContext(
+                session_id=session_id,
+                created_at=time.time(),
+                last_accessed=time.time(),
+                client_roots=[]
+            )
+            _session_store[session_id] = session
+            return session
+
+
+def _cleanup_expired_sessions(max_age: float = 3600) -> None:
+    """Remove sessions that haven't been used for max_age seconds."""
+    current_time = time.time()
+    
+    with _session_lock:
+        expired_keys = [
+            session_id for session_id, session in _session_store.items()
+            if current_time - session.last_accessed > max_age
+        ]
+        
+        for session_id in expired_keys:
+            del _session_store[session_id]
 
 
 def _set_client_roots(roots: List[types.Root]) -> None:
-    """Store the client-provided roots and attempt to load a presentation."""
-    global _client_roots, _loaded_presentation, _loaded_presentation_path
+    """Store the client-provided roots and attempt to load a presentation for the current session."""
+    session = _get_session()
     
-    _client_roots = roots
-    _loaded_presentation = None
-    _loaded_presentation_path = None
+    # Update session with new roots and clear any existing presentation
+    session.client_roots = roots
+    session.loaded_presentation = None
+    session.loaded_presentation_path = None
     
     # Scan roots for .pptx files and load the first one found
     for root in roots:
@@ -57,34 +150,23 @@ def _set_client_roots(roots: List[types.Root]) -> None:
                     # Search for .pptx files in this root
                     if root_path.is_file() and root_path.suffix.lower() == '.pptx':
                         # Root points directly to a .pptx file
-                        _load_presentation(root_path)
-                        break
+                        if session.load_presentation(root_path):
+                            break
                     elif root_path.is_dir():
                         # Search directory for .pptx files
                         pptx_files = list(root_path.glob('*.pptx'))
                         if pptx_files:
-                            _load_presentation(pptx_files[0])
-                            break
+                            if session.load_presentation(pptx_files[0]):
+                                break
         except Exception:
             # Skip invalid roots
             continue
 
 
 def _load_presentation(file_path: Path) -> bool:
-    """Load a presentation from the given file path."""
-    global _loaded_presentation, _loaded_presentation_path
-    
-    if pptx is None:
-        return False
-        
-    try:
-        _loaded_presentation = pptx.Presentation(file_path)
-        _loaded_presentation_path = file_path
-        return True
-    except Exception:
-        _loaded_presentation = None
-        _loaded_presentation_path = None
-        return False
+    """Load a presentation from the given file path for the current session."""
+    session = _get_session()
+    return session.load_presentation(file_path)
 
 
 @mcp.tool()
@@ -135,6 +217,12 @@ async def execute_python_code(code: str) -> str:
     """
     start_time = time.time()
     
+    # Clean up expired sessions periodically
+    _cleanup_expired_sessions()
+    
+    # Get the current session
+    session = _get_session()
+    
     # Validate python-pptx is available
     if pptx is None:
         return json.dumps({
@@ -145,8 +233,8 @@ async def execute_python_code(code: str) -> str:
             "execution_time": time.time() - start_time
         })
     
-    # Check if a presentation is loaded
-    if _loaded_presentation is None:
+    # Check if a presentation is loaded in this session
+    if session.loaded_presentation is None:
         return json.dumps({
             "success": False,
             "stdout": "",
@@ -155,8 +243,8 @@ async def execute_python_code(code: str) -> str:
             "execution_time": time.time() - start_time
         })
     
-    # Use the pre-loaded presentation
-    prs = _loaded_presentation
+    # Use the session's pre-loaded presentation
+    prs = session.loaded_presentation
     
     # Prepare execution context
     exec_globals = {
@@ -208,23 +296,31 @@ async def execute_python_code(code: str) -> str:
 @mcp.resource("pptx://presentation")
 async def get_presentation_tree() -> str:
     """Get the tree structure of the currently loaded PowerPoint presentation."""
-    if _loaded_presentation is None or _loaded_presentation_path is None:
+    # Clean up expired sessions periodically
+    _cleanup_expired_sessions()
+    
+    # Get the current session
+    session = _get_session()
+    
+    if session.loaded_presentation is None or session.loaded_presentation_path is None:
         return json.dumps({
             "error": "No presentation loaded",
-            "message": "Ensure a .pptx file is available in the client roots."
+            "message": "Ensure a .pptx file is available in the client roots.",
+            "session_id": session.session_id  # Include session ID for debugging
         }, indent=2)
     
     # Return get_tree() output if available, otherwise return basic info
     try:
-        if hasattr(_loaded_presentation, 'get_tree'):
-            tree_data = _loaded_presentation.get_tree()
+        if hasattr(session.loaded_presentation, 'get_tree'):
+            tree_data = session.loaded_presentation.get_tree()
             return json.dumps(tree_data, indent=2)
         else:
             # Fallback: basic presentation info
             info = {
                 "type": "presentation",
-                "slide_count": len(_loaded_presentation.slides),
-                "file_path": str(_loaded_presentation_path),
+                "slide_count": len(session.loaded_presentation.slides),
+                "file_path": str(session.loaded_presentation_path),
+                "session_id": session.session_id,
                 "note": "get_tree() method not available. Please ensure you have the latest python-pptx with introspection features."
             }
             return json.dumps(info, indent=2)
@@ -232,8 +328,9 @@ async def get_presentation_tree() -> str:
         # If get_tree() fails, return error info
         error_info = {
             "type": "presentation", 
-            "slide_count": len(_loaded_presentation.slides),
-            "file_path": str(_loaded_presentation_path),
+            "slide_count": len(session.loaded_presentation.slides),
+            "file_path": str(session.loaded_presentation_path),
+            "session_id": session.session_id,
             "error": f"Failed to get tree data: {str(e)}"
         }
         return json.dumps(error_info, indent=2)
