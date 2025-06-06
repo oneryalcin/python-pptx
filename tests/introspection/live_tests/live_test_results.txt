@@ -1,0 +1,150 @@
+================================================================================
+FEP-018: Table and Cell Introspection - Live Test Suite
+================================================================================
+Creating test presentation with various table configurations...
+✓ Test presentation created with 2 slides
+
+================================================================================
+TESTING BASIC TABLE (Slide 1)
+================================================================================
+
+============================================================
+TESTING: Basic Table Introspection
+============================================================
+✓ Basic to_dict() succeeded
+  Object type: Table
+  Identity: Table
+  Formatting flags:
+    first_row: True
+    last_row: False
+    first_col: True
+    last_col: False
+    horz_banding: True
+    vert_banding: False
+  Rows summary: <3 rows x 3 columns table structure - use expand_collections=True to see full content>
+  LLM Summary: A 3x3 table with special first row formatting, special first column formatting, horizontal banding.
+  Common operations count: 5
+
+============================================================
+TESTING: Expanded Table Introspection
+============================================================
+✓ Expanded introspection succeeded
+  Rows type: <class 'list'>
+  Table dimensions: 3 rows x 3 columns
+  Cell [0,0] type: _Cell
+  Cell [0,0] merge status:
+    is_merge_origin: False
+    is_spanned: False
+    span_height: 1
+    span_width: 1
+    text: 'Product'
+
+============================================================
+TESTING: Individual Cell Introspection
+============================================================
+✓ Cell [0,0] (header cell) introspection succeeded
+  Object type: _Cell
+  Merge status: origin=False, spanned=False
+  Span dimensions: 1x1
+  Margins: {'left': {'_object_type': 'Emu', 'emu': 91440, 'inches': 0.1, 'pt': 7.2, 'cm': 0.254, 'mm': 2.54}, 'right': {'_object_type': 'Emu', 'emu': 91440, 'inches': 0.1, 'pt': 7.2, 'cm': 0.254, 'mm': 2.54}, 'top': {'_object_type': 'Emu', 'emu': 45720, 'inches': 0.05, 'pt': 3.6, 'cm': 0.127, 'mm': 1.27}, 'bottom': {'_object_type': 'Emu', 'emu': 45720, 'inches': 0.05, 'pt': 3.6, 'cm': 0.127, 'mm': 1.27}}
+  LLM Summary: Cell containing 'Product'.
+✓ Cell [1,1] (data cell) introspection succeeded
+  Object type: _Cell
+  Merge status: origin=False, spanned=False
+  Span dimensions: 1x1
+  Margins: {'left': {'_object_type': 'Emu', 'emu': 91440, 'inches': 0.1, 'pt': 7.2, 'cm': 0.254, 'mm': 2.54}, 'right': {'_object_type': 'Emu', 'emu': 91440, 'inches': 0.1, 'pt': 7.2, 'cm': 0.254, 'mm': 2.54}, 'top': {'_object_type': 'Emu', 'emu': 45720, 'inches': 0.05, 'pt': 3.6, 'cm': 0.127, 'mm': 1.27}, 'bottom': {'_object_type': 'Emu', 'emu': 45720, 'inches': 0.05, 'pt': 3.6, 'cm': 0.127, 'mm': 1.27}}
+  LLM Summary: Cell containing '$1,000'.
+
+============================================================
+TESTING: Table Relationships
+============================================================
+✓ Relationships introspection succeeded
+  Relationships found: ['parent_graphic_frame']
+  Parent graphic frame type: SerializationError_parent_graphic_frame
+
+============================================================
+TESTING: LLM-Friendly Formatting
+============================================================
+✓ LLM formatting test succeeded
+  With format_for_llm=True: 1046 chars
+  With format_for_llm=False: 643 chars
+  LLM context available: True
+  Summary: A 3x3 table with special first row formatting, special first column formatting, horizontal banding.
+
+============================================================
+COMPREHENSIVE TABLE ANALYSIS
+============================================================
+✓ Full introspection analysis completed
+
+Table Summary: A 3x3 table with special first row formatting, special first column formatting, horizontal banding.
+
+Table Structure Analysis:
+  Dimensions: 3 rows x 3 columns
+  Active formatting: first_row, first_col, horz_banding
+
+Cell Content Analysis:
+  Total cells: 9
+  Cells with content: 9
+  Merge-origin cells: 0
+  Spanned cells: 0
+
+Serialization Analysis:
+  Full JSON size: 48,873 characters
+  Estimated size per cell: 5430 chars
+
+================================================================================
+TESTING COMPLEX TABLE WITH MERGES (Slide 2)
+================================================================================
+
+============================================================
+TESTING: Merged Cell Introspection
+============================================================
+✓ Merge-origin cell found at [0,0]
+  Span: 4x1
+  LLM Context: Cell containing 'Quarterly Sales Report'. Merged across 4 column(s) and 1 row(s).
+✓ Spanned cell found at [0,1]
+  LLM Context: Cell empty. Spanned by a merged cell.
+✓ Spanned cell found at [0,2]
+  LLM Context: Cell empty. Spanned by a merged cell.
+✓ Spanned cell found at [0,3]
+  LLM Context: Cell empty. Spanned by a merged cell.
+✓ Merge-origin cell found at [2,0]
+  Span: 1x2
+  LLM Context: Cell containing 'North'. Merged across 1 column(s) and 2 row(s).
+✓ Spanned cell found at [3,0]
+  LLM Context: Cell empty. Spanned by a merged cell.
+
+Merge Summary:
+  Merge-origin cells: 2
+  Spanned cells: 4
+
+============================================================
+COMPREHENSIVE TABLE ANALYSIS
+============================================================
+✓ Full introspection analysis completed
+
+Table Summary: A 4x4 table with special first row formatting, special last row formatting, special first column formatting, special last column formatting, horizontal banding, vertical banding.
+
+Table Structure Analysis:
+  Dimensions: 4 rows x 4 columns
+  Active formatting: first_row, last_row, first_col, last_col, horz_banding, vert_banding
+
+Cell Content Analysis:
+  Total cells: 16
+  Cells with content: 12
+  Merge-origin cells: 2
+  Spanned cells: 4
+
+Serialization Analysis:
+  Full JSON size: 79,038 characters
+  Estimated size per cell: 4939 chars
+
+================================================================================
+FINAL RESULTS
+================================================================================
+Tests passed: 6/6
+Success rate: 100.0%
+🎉 All tests passed! FEP-018 implementation is working correctly.
+
+📁 Test presentation saved to: test_table_introspection_output.pptx
+   You can open this file in PowerPoint to inspect the test tables.

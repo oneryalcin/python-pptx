@@ -1,0 +1,272 @@
+FEP-020: Wide-Angle Tree View (get_tree) - Live Testing
+================================================================================
+This script tests the get_tree() functionality implementation.
+Testing with real python-pptx objects and presentations.
+
+================================================================================
+FEP-020 Live Test: Presentation Tree Functionality
+================================================================================
+
+[TEST] Basic Presentation Creation
+  Basic tree structure: Presentation with 0 children
+  Content summary: Presentation: 'Untitled Presentation' (1 master)
+  Identity keys: ['class_name', 'slide_count', 'master_count', 'slide_width', 'slide_height']
+✓ PASSED: Basic Presentation Creation
+
+[TEST] Presentation with Slides
+  Tree depth validation: 0=0, 1=3, 2=nested
+✓ PASSED: Presentation with Slides
+
+[TEST] Slide Tree Functionality
+  Slide tree: Slide 256 (2 shapes, 2 placeholders)
+  Access path: slides[0]
+  Identity: slide_id=256
+✓ PASSED: Slide Tree Functionality
+
+[TEST] Shape Tree Functionality
+  Found 3 shapes on slide
+  First shape geometry: {'left': '0.50 in', 'top': '0.30 in', 'width': '9.00 in', 'height': '1.25 in', 'rotation': '0°'}
+  First shape summary: PLACEHOLDER 'Title 1' (TITLE placeholder) (empty text)
+✓ PASSED: Shape Tree Functionality
+
+[TEST] Group Shape Functionality
+  Group tree: Group (2 shapes)
+  Group children: 2
+✓ PASSED: Group Shape Functionality
+
+[TEST] Access Path Generation
+  Validated access paths for 2 slides
+✓ PASSED: Access Path Generation
+
+[TEST] Content Summaries
+  Presentation summary: Presentation: 'FEP-020 Test Presentation' (1 slide, 1 master)
+  Slide summary: Slide 256 - Test Slide Title (2 shapes, 2 placeholders)
+✓ PASSED: Content Summaries
+
+[TEST] Error Handling
+  Error handling tests passed
+✓ PASSED: Error Handling
+
+================================================================================
+TEST SUMMARY
+================================================================================
+Tests Run: 8
+Tests Passed: 8
+Tests Failed: 0
+
+Success Rate: 100.0%
+
+================================================================================
+FEP-020 DEMONSTRATION: Wide-Angle Tree View
+================================================================================
+
+1. PRESENTATION TREE (max_depth=0 - Root only):
+{
+  "_object_type": "Presentation",
+  "_identity": {
+    "class_name": "Presentation",
+    "title": "Demo: Tree View Functionality",
+    "slide_count": 2,
+    "master_count": 1,
+    "slide_width": "10.00 in",
+    "slide_height": "7.50 in"
+  },
+  "access_path": "",
+  "geometry": null,
+  "content_summary": "Presentation: 'Demo: Tree View Functionality' (2 slides, 1 master)"
+}
+
+2. PRESENTATION TREE (max_depth=1 - Include slides):
+{
+  "_object_type": "Presentation",
+  "_identity": {
+    "class_name": "Presentation",
+    "title": "Demo: Tree View Functionality",
+    "slide_count": 2,
+    "master_count": 1,
+    "slide_width": "10.00 in",
+    "slide_height": "7.50 in"
+  },
+  "access_path": "",
+  "geometry": null,
+  "content_summary": "Presentation: 'Demo: Tree View Functionality' (2 slides, 1 master)",
+  "children": [
+    {
+      "_object_type": "Slide",
+      "_identity": {
+        "slide_id": 256,
+        "class_name": "Slide",
+        "layout_name": "Title Slide"
+      },
+      "access_path": "slides[0]",
+      "geometry": null,
+      "content_summary": "Slide 256 - Wide-Angle Tree View Demo (2 shapes, 2 placeholders)"
+    },
+    {
+      "_object_type": "Slide",
+      "_identity": {
+        "slide_id": 257,
+        "class_name": "Slide",
+        "layout_name": "Title Only"
+      },
+      "access_path": "slides[1]",
+      "geometry": null,
+      "content_summary": "Slide 257 (3 shapes, 1 placeholder)"
+    }
+  ]
+}
+
+3. PRESENTATION TREE (max_depth=2 - Include slide contents):
+{
+  "_object_type": "Presentation",
+  "content_summary": "Presentation: 'Demo: Tree View Functionality' (2 slides, 1 master)",
+  "children_count": 2,
+  "first_slide_children_count": 0
+}
+
+4. INDIVIDUAL SLIDE TREE:
+{
+  "_object_type": "Slide",
+  "_identity": {
+    "slide_id": 257,
+    "class_name": "Slide",
+    "layout_name": "Title Only"
+  },
+  "access_path": "slides[1]",
+  "geometry": null,
+  "content_summary": "Slide 257 (3 shapes, 1 placeholder)",
+  "children": [
+    {
+      "_object_type": "SlidePlaceholder",
+      "_identity": {
+        "shape_id": 2,
+        "name": "Title 1",
+        "class_name": "SlidePlaceholder",
+        "shape_type": "PLACEHOLDER",
+        "placeholder_type": "TITLE",
+        "placeholder_idx": 0
+      },
+      "access_path": "slides[1].shapes[0]",
+      "geometry": {
+        "left": "0.50 in",
+        "top": "0.30 in",
+        "width": "9.00 in",
+        "height": "1.25 in",
+        "rotation": "0\u00b0"
+      },
+      "content_summary": "PLACEHOLDER 'Title 1' (TITLE placeholder) (empty text)"
+    },
+    {
+      "_object_type": "Shape",
+      "_identity": {
+        "shape_id": 3,
+        "name": "TextBox 2",
+        "class_name": "Shape",
+        "shape_type": "TEXT_BOX"
+      },
+      "access_path": "slides[1].shapes[1]",
+      "geometry": {
+        "left": "1.00 in",
+        "top": "1.00 in",
+        "width": "4.00 in",
+        "height": "1.00 in",
+        "rotation": "0\u00b0"
+      },
+      "content_summary": "TEXT_BOX 'TextBox 2' Text: 'This is a text box with sam...'"
+    },
+    {
+      "_object_type": "GroupShape",
+      "_identity": {
+        "shape_id": 6,
+        "name": "Group 5",
+        "class_name": "GroupShape",
+        "shape_type": "GROUP"
+      },
+      "access_path": "slides[1].shapes[2]",
+      "geometry": {
+        "left": "1.00 in",
+        "top": "3.00 in",
+        "width": "5.00 in",
+        "height": "1.00 in",
+        "rotation": "0\u00b0"
+      },
+      "content_summary": "Group (2 shapes)"
+    }
+  ]
+}
+
+5. GROUP SHAPE TREE:
+{
+  "_object_type": "GroupShape",
+  "_identity": {
+    "shape_id": 6,
+    "name": "Group 5",
+    "class_name": "GroupShape",
+    "shape_type": "GROUP"
+  },
+  "access_path": "group_shape_6",
+  "geometry": {
+    "left": "1.00 in",
+    "top": "3.00 in",
+    "width": "5.00 in",
+    "height": "1.00 in",
+    "rotation": "0\u00b0"
+  },
+  "content_summary": "Group (2 shapes)",
+  "children": [
+    {
+      "_object_type": "Shape",
+      "_identity": {
+        "shape_id": 4,
+        "name": "Rectangle 3",
+        "class_name": "Shape",
+        "shape_type": "AUTO_SHAPE"
+      },
+      "access_path": "group_shape_6.shapes[0]",
+      "geometry": {
+        "left": "1.00 in",
+        "top": "3.00 in",
+        "width": "2.00 in",
+        "height": "1.00 in",
+        "rotation": "0\u00b0"
+      },
+      "content_summary": "AUTO_SHAPE 'Rectangle 3' (empty text)"
+    },
+    {
+      "_object_type": "Shape",
+      "_identity": {
+        "shape_id": 5,
+        "name": "Oval 4",
+        "class_name": "Shape",
+        "shape_type": "AUTO_SHAPE"
+      },
+      "access_path": "group_shape_6.shapes[1]",
+      "geometry": {
+        "left": "4.00 in",
+        "top": "3.00 in",
+        "width": "2.00 in",
+        "height": "1.00 in",
+        "rotation": "0\u00b0"
+      },
+      "content_summary": "AUTO_SHAPE 'Oval 4' (empty text)"
+    }
+  ]
+}
+
+6. ACCESS PATH EXAMPLES:
+  Slide 0: slides[0]
+  Slide 1: slides[1]
+
+================================================================================
+FEP-020 LIVE TESTING COMPLETE
+================================================================================
+🎉 ALL TESTS PASSED! FEP-020 implementation is working correctly.
+
+Key Features Validated:
+✓ get_tree() method on Presentation, Slide, and GroupShape
+✓ Hierarchical tree structure with configurable depth
+✓ Access path generation for stable object references
+✓ Rich content summaries for AI discovery
+✓ Identity information for object identification
+✓ Geometry information for spatial understanding
+✓ Error handling and edge cases

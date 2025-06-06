@@ -1,0 +1,471 @@
+
+============================================================
+  FEP-019 Live Test: Precision Inspection Controls
+============================================================
+Testing field selection and structured collection summaries
+
+============================================================
+  Field Path Parsing Tests
+============================================================
+
+Test Case 1: ['_identity.shape_id']
+
+Parsed Field Tree:
+-----------------
+{
+  "_identity": {
+    "shape_id": true
+  }
+}
+
+Test Case 2: ['properties.fill.type', 'properties.line.width']
+
+Parsed Field Tree:
+-----------------
+{
+  "properties": {
+    "fill": {
+      "type": true
+    },
+    "line": {
+      "width": true
+    }
+  }
+}
+
+Test Case 3: ['properties.fill.*']
+
+Parsed Field Tree:
+-----------------
+{
+  "properties": {
+    "fill": {
+      "*": true
+    }
+  }
+}
+
+Test Case 4: ['_identity.class_name', 'properties.*', 'relationships.parent']
+
+Parsed Field Tree:
+-----------------
+{
+  "_identity": {
+    "class_name": true
+  },
+  "properties": {
+    "*": true
+  },
+  "relationships": {
+    "parent": true
+  }
+}
+
+============================================================
+  Structured Collection Summary Tests
+============================================================
+
+String List: ['item1', 'item2', 'item3']
+
+Collection Summary:
+------------------
+{
+  "_collection_summary": {
+    "count": 3,
+    "item_type": "str",
+    "collection_type": "list"
+  }
+}
+
+Mixed List: ['string', 42, True]
+
+Collection Summary:
+------------------
+{
+  "_collection_summary": {
+    "count": 3,
+    "item_type": "str",
+    "collection_type": "list"
+  }
+}
+
+Empty List: []
+
+Collection Summary:
+------------------
+{
+  "_collection_summary": {
+    "count": 0,
+    "item_type": "object",
+    "collection_type": "list"
+  }
+}
+
+String Dict: {'key1': 'value1', 'key2': 'value2'}
+
+Collection Summary:
+------------------
+{
+  "_collection_summary": {
+    "count": 2,
+    "item_type": "str",
+    "collection_type": "dict"
+  }
+}
+
+Empty Dict: {}
+
+Collection Summary:
+------------------
+{
+  "_collection_summary": {
+    "count": 0,
+    "item_type": "object",
+    "collection_type": "dict"
+  }
+}
+
+Tuple: ('tuple1', 'tuple2')
+
+Collection Summary:
+------------------
+{
+  "_collection_summary": {
+    "count": 2,
+    "item_type": "str",
+    "collection_type": "tuple"
+  }
+}
+
+============================================================
+  Basic Precision Inspection Tests
+============================================================
+
+1. Slide Identity Only:
+{
+  "_object_type": "Slide",
+  "_identity": {
+    "class_name": "Slide",
+    "memory_address": "0x102c8c1a0"
+  }
+}
+
+2. Slide Shapes Collection Summary:
+{
+  "_object_type": "Slide",
+  "properties": {
+    "shapes": {
+      "_collection_summary": "2 shapes"
+    }
+  }
+}
+
+3. Specific Shape Properties:
+{
+  "_object_type": "SlidePlaceholder",
+  "_identity": {
+    "class_name": "SlidePlaceholder"
+  },
+  "properties": {
+    "name": "Title 1",
+    "shape_type": {
+      "_object_type": "MSO_SHAPE_TYPE",
+      "name": "PLACEHOLDER",
+      "value": 14,
+      "description": "Placeholder"
+    }
+  }
+}
+
+============================================================
+  Wildcard Field Selection Tests
+============================================================
+
+1. All Properties (wildcard):
+{
+  "_object_type": "Shape",
+  "properties": {
+    "adjustments": "<pptx.shapes.autoshape.AdjustmentCollection object at 0x1021eb360>",
+    "click_action": "<pptx.action.ActionSetting object at 0x1021eb950>",
+    "element": "<CT_Shape '<p:sp>' at 0x102c94aa0>",
+    "fill": {
+      "_object_type": "FillFormat",
+      "_identity": {
+        "class_name": "FillFormat",
+        "memory_address": "0x102c41050",
+        "description": "Represents the fill formatting of an object."
+      },
+      "properties": {
+        "type": {
+          "_object_type": "MSO_FILL_TYPE",
+          "name": "BACKGROUND",
+          "value": 5,
+          "description": "The shape is transparent, such that whatever is behind the shape shows through. Often this is the slide background, but if a visible shape is behind, that will show through."
+        },
+        "fore_color": null,
+        "back_color": null,
+        "pattern": null,
+        "gradient_stops": null,
+        "gradient_angle": null,
+        "image_rId": null
+      },
+      "_llm_context": {
+        "description": "Describes the fill style of an element.",
+        "summary": "Background fill (transparent).",
+        "common_operations": [
+          "set solid color (fill.solid(), fill.fore_color = ...)",
+          "set gradient (fill.gradient(), access fill.gradient_stops)",
+          "set pattern (fill.patterned(), set fill.pattern)",
+          "set picture (fill.blip(), set fill.rId)",
+          "set no fill (fill.background())"
+        ]
+      },
+      "relationships": {}
+    },
+    "has_chart": false,
+    "has_table": false,
+    "has_text_frame": true,
+    "height": {
+      "_object_type": "Emu",
+      "emu": 914400,
+      "inches": 1.0,
+      "pt": 72.0,
+      "cm": 2.54,
+      "mm": 25.4
+    },
+    "is_placeholder": false,
+    "left": {
+      "_object_type": "Emu",
+      "emu": 914400,
+      "inches": 1.0,
+      "pt": 72.0,
+      "cm": 2.54,
+      "mm": 25.4
+    },
+    "line": {
+      "_object_type": "LineFormat",
+      "_identity": {
+        "class_name": "LineFormat",
+        "memory_address": "0x1021eba80"
+      },
+      "properties": {
+        "fill": {
+          "_truncated": "Max depth reached for FillFormat"
+        },
+        "width": {
+          "_object_type": "Emu",
+          "emu": 0,
+          "inches": 0.0,
+          "pt": 0.0,
+          "cm": 0.0,
+          "mm": 0.0
+        },
+        "dash_style": null
+      },
+      "_llm_context": {
+        "description": "Describes the line (outline/border) style of an element.",
+        "summary": "No line (transparent or zero width).",
+        "common_operations": [
+          "set line color (line.color.rgb = RGBColor(...))",
+          "set line width (line.width = Pt(...))",
+          "set dash style (line.dash_style = MSO_LINE.DASH)",
+          "remove line (line.fill.background())",
+          "set solid fill (line.fill.solid())"
+        ]
+      },
+      "relationships": {}
+    },
+    "ln": "<CT_LineProperties '<a:ln>' at 0x102c94b90>",
+    "name": "TextBox 3",
+    "part": "<pptx.parts.slide.SlidePart object at 0x102c32350>",
+    "rotation": 0.0,
+    "shadow": "<pptx.dml.effect.ShadowFormat object at 0x1021ebbb0>",
+    "shape_id": 4,
+    "shape_type": {
+      "_object_type": "MSO_SHAPE_TYPE",
+      "name": "TEXT_BOX",
+      "value": 17,
+      "description": "Text box"
+    },
+    "text": "Test textbox",
+    "text_frame": {
+      "_object_type": "TextFrame",
+      "_identity": {
+        "class_name": "TextFrame",
+        "memory_address": "0x102c7b3b0",
+        "description": "Container for text within a shape.",
+        "parent_shape_name": "TextBox 3"
+      },
+      "properties": {
+        "text": "Test textbox",
+        "paragraphs": {
+          "_collection_summary": "1 paragraphs"
+        },
+        "margin_left": {
+          "_object_type": "Emu",
+          "emu": 91440,
+          "inches": 0.1,
+          "pt": 7.2,
+          "cm": 0.254,
+          "mm": 2.54
+        },
+        "margin_top": {
+          "_object_type": "Emu",
+          "emu": 45720,
+          "inches": 0.05,
+          "pt": 3.6,
+          "cm": 0.127,
+          "mm": 1.27
+        },
+        "margin_right": {
+          "_object_type": "Emu",
+          "emu": 91440,
+          "inches": 0.1,
+          "pt": 7.2,
+          "cm": 0.254,
+          "mm": 2.54
+        },
+        "margin_bottom": {
+          "_object_type": "Emu",
+          "emu": 45720,
+          "inches": 0.05,
+          "pt": 3.6,
+          "cm": 0.127,
+          "mm": 1.27
+        },
+        "vertical_anchor": null,
+        "word_wrap": false,
+        "auto_size": {
+          "_object_type": "MSO_AUTO_SIZE",
+          "name": "SHAPE_TO_FIT_TEXT",
+          "value": 1,
+          "description": "The shape height and possibly width are adjusted to fit the text.\n\nNote this setting interacts with the TextFrame.word_wrap property setting. If word wrap is turned on, only the height of the shape will be adjusted; soft line breaks will be used to fit the text horizontally."
+        },
+        "alignment": null,
+        "level": 0,
+        "font": {
+          "_object_type": "Font",
+          "_depth_exceeded": true
+        }
+      },
+      "_llm_context": {
+        "description": "TextFrame containing 1 paragraph(s). Text starts with: \"Test textbox\". Auto-size: SHAPE_TO_FIT_TEXT. Word wrap: Off.",
+        "summary": "TextFrame containing 1 paragraph(s). Text starts with: \"Test textbox\". Auto-size: SHAPE_TO_FIT_TEXT. Word wrap: Off.",
+        "common_operations": [
+          "access/modify text (text_frame.text = ...)",
+          "add paragraphs (text_frame.add_paragraph())",
+          "access paragraphs (text_frame.paragraphs)",
+          "set margins (text_frame.margin_left = Inches(...))",
+          "set vertical anchor (text_frame.vertical_anchor = MSO_ANCHOR...)",
+          "set word wrap (text_frame.word_wrap = True/False/None)",
+          "set auto-size (text_frame.auto_size = MSO_AUTO_SIZE...)",
+          "set default paragraph alignment/level (text_frame.alignment, text_frame.level)",
+          "set default font (text_frame.font...)"
+        ]
+      },
+      "relationships": {
+        "parent_shape": {
+          "_reference": "Circular reference to Shape at 0x1021c2510"
+        }
+      }
+    },
+    "top": {
+      "_object_type": "Emu",
+      "emu": 914400,
+      "inches": 1.0,
+      "pt": 72.0,
+      "cm": 2.54,
+      "mm": 25.4
+    },
+    "visible": true,
+    "width": {
+      "_object_type": "Emu",
+      "emu": 914400,
+      "inches": 1.0,
+      "pt": 72.0,
+      "cm": 2.54,
+      "mm": 25.4
+    }
+  }
+}
+
+2. All Identity Fields (wildcard):
+{
+  "_object_type": "Shape",
+  "_identity": {
+    "class_name": "Shape",
+    "memory_address": "0x1021c2510",
+    "shape_id": 4,
+    "name": "TextBox 3",
+    "is_placeholder": false,
+    "shape_type": {
+      "_object_type": "MSO_SHAPE_TYPE",
+      "name": "TEXT_BOX",
+      "value": 17,
+      "description": "Text box"
+    }
+  }
+}
+
+============================================================
+  Presentation-Level Precision Inspection
+============================================================
+
+1. Presentation Core Properties Only:
+{
+  "_object_type": "Presentation",
+  "properties": {
+    "core_properties": {
+      "author": "",
+      "category": "",
+      "comments": "generated using python-pptx",
+      "content_status": "",
+      "created": "2013-01-27T09:14:16",
+      "identifier": "",
+      "keywords": "",
+      "language": "",
+      "last_modified_by": "Steve Canny",
+      "last_printed": null,
+      "modified": "2013-01-27T09:15:58",
+      "revision": 1,
+      "subject": "",
+      "title": "",
+      "version": ""
+    }
+  }
+}
+
+2. Slides Collection Summary:
+{
+  "_object_type": "Presentation",
+  "properties": {
+    "slides": "Collection of 3 slides (not expanded)"
+  }
+}
+
+============================================================
+  Backward Compatibility Tests
+============================================================
+
+1. Full introspection (no fields parameter):
+Result keys: ['_object_type', '_identity', 'properties', 'relationships']
+Properties keys: ['has_notes_slide', 'follow_master_background', 'shapes', 'placeholders']
+
+2. Traditional parameter usage:
+Result structure maintained: ['_object_type', '_identity', 'properties', '_llm_context']
+LLM context present: True
+Relationships excluded: True
+
+============================================================
+  Performance Comparison
+============================================================
+
+Testing on slide with 5 shapes...
+Full introspection: 0.000s, 1166 characters
+Precision introspection: 0.000s, 126 characters
+Performance improvement: 3.5x faster, 89.2% smaller
+
+============================================================
+  ✅ All Tests Completed Successfully!
+============================================================
+FEP-019 implementation appears to be working correctly.
