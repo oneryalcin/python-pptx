@@ -371,6 +371,34 @@ async def secure_tool(user_input: str) -> str:
 
 ---
 
+## MCP Documentation Resources
+
+### Local Documentation
+- **`mcp-llm-annotated.txt`** - Fast lookup guide for MCP concepts with line-based indexing
+- **`mcp-llm.txt`** - Complete MCP documentation (19k+ lines) - DO NOT load fully into context
+
+**Usage Example:**
+```bash
+# Find tools implementation guidance
+# Check mcp-llm-annotated.txt → "Tools Overview & Implementation: Lines 2270-2750"
+# Then: Read file_path="mcp_server/mcp-llm.txt" offset=2270 limit=480
+```
+
+### Official Python SDK Resources
+- **Repository:** https://github.com/modelcontextprotocol/python-sdk
+- **Examples:** https://github.com/modelcontextprotocol/python-sdk/tree/main/examples
+- **Core patterns, server implementations, and client usage examples**
+
+### Quick MCP Concepts Reference
+- **Tools:** Lines 2270-2750 (implementation patterns, security)
+- **Resources:** Lines 1680-1939 (file access, content discovery)  
+- **Prompts:** Lines 1251-1679 (dynamic content generation)
+- **Client Development:** Lines 3950-5585 (integration guide)
+- **Server Development:** Lines 5586-7380 (comprehensive server guide)
+- **Debugging:** Lines 3182-3627 (troubleshooting, inspector tools)
+
+---
+
 ## Status Summary
 
 This guide covers the essential patterns for MEP development based on MEP-001 implementation. Key learnings:
