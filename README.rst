@@ -18,6 +18,45 @@ More information is available in the `python-pptx documentation`_.
 Browse `examples with screenshots`_ to get a quick idea what you can do with
 python-pptx.
 
+MCP Server for AI Agents
+-------------------------
+
+python-pptx includes an MCP (Model Context Protocol) server that enables AI agents
+like Claude to work with PowerPoint presentations. The server provides AI agents with
+essential context and tools for safe, effective presentation manipulation.
+
+Installation for MCP
+~~~~~~~~~~~~~~~~~~~~~
+
+Install the MCP server dependencies::
+
+    pip install -r requirements-dev.txt
+
+Configuration for Claude Desktop
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Add to your Claude Desktop configuration::
+
+    {
+      "mcpServers": {
+        "python-pptx": {
+          "command": "python",
+          "args": ["/path/to/python-pptx/mcp_server/server/main.py"],
+          "env": {}
+        }
+      }
+    }
+
+Available Tools
+~~~~~~~~~~~~~~~
+
+* **get_info**: Essential onboarding tool providing AI agents with python-pptx usage patterns and examples
+
+Usage
+~~~~~
+
+AI agents must call ``get_info`` first to receive proper context and examples for working with presentations safely and effectively.
+
 .. _`python-pptx documentation`:
    https://python-pptx.readthedocs.org/en/latest/
 
