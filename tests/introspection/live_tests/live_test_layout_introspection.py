@@ -139,7 +139,7 @@ def test_layout_placeholder_introspection():
         # Verify properties include layout placeholder specifics
         props = result["properties"]
         assert "inherits_dimensions" in props, "Missing inherits_dimensions"
-        assert props["inherits_dimensions"] == True, "inherits_dimensions should be True"
+        assert props["inherits_dimensions"] is True, "inherits_dimensions should be True"
         
         # Verify LLM context
         context = result["_llm_context"]
@@ -308,7 +308,7 @@ def test_comprehensive_layout_analysis():
                 assert layout.name in result["_identity"]["description"]
                 
                 successful_layouts += 1
-                print(f"  ✓ Introspection successful")
+                print("  ✓ Introspection successful")
                 
             except Exception as e:
                 print(f"  ✗ Introspection failed: {e}")

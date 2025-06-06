@@ -355,13 +355,13 @@ def test_6_comprehensive_master_analysis():
         shape_count = len(shapes) if isinstance(shapes, list) else "Unknown"
         
         # Print comprehensive analysis
-        print(f"\n📊 COMPREHENSIVE SLIDE MASTER ANALYSIS")
+        print("\n📊 COMPREHENSIVE SLIDE MASTER ANALYSIS")
         print(f"{'─'*60}")
         print(f"Master Name: {result.get('_identity', {}).get('name', 'Default Master')}")
         print(f"Object Type: {result.get('_object_type', 'Unknown')}")
         print(f"Description: {result.get('_identity', {}).get('description', 'N/A')}")
         
-        print(f"\n🎨 DESIGN PROPERTIES")
+        print("\n🎨 DESIGN PROPERTIES")
         print(f"Background Fill: {safe_dict_access(properties, 'background_fill', '_object_type')}")
         print(f"Color Map: {'Present' if color_map else 'Not present'}")
         if color_map:
@@ -372,13 +372,13 @@ def test_6_comprehensive_master_analysis():
         if text_styles.get('available_styles'):
             print(f"  - Available: {', '.join(text_styles['available_styles'])}")
         
-        print(f"\n📐 CONTENT STRUCTURE")
+        print("\n📐 CONTENT STRUCTURE")
         print(f"Non-placeholder shapes: {shape_count}")
         print(f"Master placeholders: {len(placeholder_types)}")
         if placeholder_types:
             print(f"  - Types: {', '.join(placeholder_types)}")
         
-        print(f"\n🔗 RELATIONSHIPS")
+        print("\n🔗 RELATIONSHIPS")
         layouts_info = relationships.get("slide_layouts_summary", relationships.get("slide_layouts", []))
         if isinstance(layouts_info, list):
             print(f"Slide layouts: {len(layouts_info)} layouts")
@@ -391,7 +391,7 @@ def test_6_comprehensive_master_analysis():
         else:
             print(f"Theme part: {theme_part}")
         
-        print(f"\n🤖 LLM CONTEXT")
+        print("\n🤖 LLM CONTEXT")
         print(f"Description: {llm_context.get('description', 'N/A')}")
         print(f"Role: {llm_context.get('role', 'N/A')}")
         
@@ -442,17 +442,17 @@ def main():
     total = len(results)
     
     print(f"\n{'='*80}")
-    print(f"📊 TEST SUMMARY")
+    print("📊 TEST SUMMARY")
     print(f"{'='*80}")
     print(f"Tests passed: {passed}/{total}")
     print(f"Tests failed: {total - passed}/{total}")
     print(f"Success rate: {(passed/total)*100:.1f}%")
     
     if passed == total:
-        print(f"🎉 ALL TESTS PASSED! FEP-017 implementation is working correctly.")
+        print("🎉 ALL TESTS PASSED! FEP-017 implementation is working correctly.")
         return 0
     else:
-        print(f"❌ Some tests failed. Please review the implementation.")
+        print("❌ Some tests failed. Please review the implementation.")
         return 1
 
 

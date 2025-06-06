@@ -66,7 +66,7 @@ def test_image_introspection():
         
         # Test full introspection
         result = image.to_dict()
-        print(f"\nImage to_dict() structure:")
+        print("\nImage to_dict() structure:")
         print(f"  Object type: {result['_object_type']}")
         print(f"  Identity keys: {list(result['_identity'].keys())}")
         print(f"  Properties keys: {list(result['properties'].keys())}")
@@ -75,7 +75,7 @@ def test_image_introspection():
         
         # Test specific properties
         props = result['properties']
-        print(f"\nImage properties validation:")
+        print("\nImage properties validation:")
         print(f"  Content type: {props['content_type']}")
         print(f"  Extension: {props['extension']}")
         print(f"  Dimensions: {props['dimensions_px']}")
@@ -84,7 +84,7 @@ def test_image_introspection():
         
         # Test LLM context
         llm = result['_llm_context']
-        print(f"\nImage LLM context:")
+        print("\nImage LLM context:")
         print(f"  Description: {llm['description']}")
         print(f"  Summary: {llm['summary']}")
         print(f"  Operations count: {len(llm['common_operations'])}")
@@ -123,7 +123,7 @@ def test_picture_basic_introspection():
         
         # Test to_dict()
         result = picture.to_dict()
-        print(f"Picture to_dict() structure:")
+        print("Picture to_dict() structure:")
         print(f"  Object type: {result['_object_type']}")
         print(f"  Identity keys: {list(result['_identity'].keys())}")
         print(f"  Properties keys: {list(result['properties'].keys())}")
@@ -132,7 +132,7 @@ def test_picture_basic_introspection():
         
         # Test identity
         identity = result['_identity']
-        print(f"\nPicture identity:")
+        print("\nPicture identity:")
         print(f"  Class: {identity['class_name']}")
         print(f"  Shape ID: {identity['shape_id']}")
         print(f"  Name: {identity['name']}")
@@ -140,7 +140,7 @@ def test_picture_basic_introspection():
         
         # Test properties
         props = result['properties']
-        print(f"\nPicture properties:")
+        print("\nPicture properties:")
         print(f"  Crop left: {props['crop_left']}")
         print(f"  Crop top: {props['crop_top']}")
         print(f"  Crop right: {props['crop_right']}")
@@ -152,7 +152,7 @@ def test_picture_basic_introspection():
         # Test image details
         if 'image_details' in props:
             img_details = props['image_details']
-            print(f"\nImage details in picture:")
+            print("\nImage details in picture:")
             print(f"  Type: {img_details['_object_type']}")
             if 'properties' in img_details:
                 img_props = img_details['properties']
@@ -161,7 +161,7 @@ def test_picture_basic_introspection():
         
         # Test LLM context
         llm = result['_llm_context']
-        print(f"\nPicture LLM context:")
+        print("\nPicture LLM context:")
         print(f"  Description: {llm['description']}")
         print(f"  Summary: {llm['summary']}")
         print(f"  Operations count: {len(llm['common_operations'])}")
@@ -208,7 +208,7 @@ def test_picture_with_cropping():
         result = picture.to_dict()
         props = result['properties']
         
-        print(f"Cropped picture properties:")
+        print("Cropped picture properties:")
         print(f"  Crop left: {props['crop_left']} (expected: 0.1)")
         print(f"  Crop top: {props['crop_top']} (expected: 0.05)")
         print(f"  Crop right: {props['crop_right']} (expected: 0.15)")
@@ -264,7 +264,7 @@ def test_picture_with_masking():
         result = picture.to_dict()
         props = result['properties']
         
-        print(f"Masked picture properties:")
+        print("Masked picture properties:")
         mask_type = props['auto_shape_mask_type']
         print(f"  Auto shape mask type: {mask_type}")
         

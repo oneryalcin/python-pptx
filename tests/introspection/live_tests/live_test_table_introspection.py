@@ -135,7 +135,7 @@ def test_basic_table_introspection(table):
         # Test basic to_dict() call
         result = table.to_dict(expand_collections=False)
         
-        print(f"✓ Basic to_dict() succeeded")
+        print("✓ Basic to_dict() succeeded")
         print(f"  Object type: {result['_object_type']}")
         
         # Check identity
@@ -145,7 +145,7 @@ def test_basic_table_introspection(table):
         
         # Check properties
         props = result['properties']
-        print(f"  Formatting flags:")
+        print("  Formatting flags:")
         print(f"    first_row: {props['first_row']}")
         print(f"    last_row: {props['last_row']}")
         print(f"    first_col: {props['first_col']}")
@@ -182,7 +182,7 @@ def test_expanded_table_introspection(table):
         props = result['properties']
         rows = props['rows']
         
-        print(f"✓ Expanded introspection succeeded")
+        print("✓ Expanded introspection succeeded")
         print(f"  Rows type: {type(rows)}")
         print(f"  Table dimensions: {len(rows)} rows x {len(rows[0]) if rows else 0} columns")
         
@@ -194,7 +194,7 @@ def test_expanded_table_introspection(table):
             # Check if cell has expected properties
             if 'properties' in cell_0_0:
                 cell_props = cell_0_0['properties']
-                print(f"  Cell [0,0] merge status:")
+                print("  Cell [0,0] merge status:")
                 print(f"    is_merge_origin: {cell_props.get('is_merge_origin')}")
                 print(f"    is_spanned: {cell_props.get('is_spanned')}")
                 print(f"    span_height: {cell_props.get('span_height')}")
@@ -299,7 +299,7 @@ def test_merged_cell_introspection(table):
                     print(f"✓ Spanned cell found at [{row_idx},{col_idx}]")
                     print(f"  LLM Context: {context['summary']}")
         
-        print(f"\nMerge Summary:")
+        print("\nMerge Summary:")
         print(f"  Merge-origin cells: {merge_origins_found}")
         print(f"  Spanned cells: {spanned_cells_found}")
         
@@ -321,7 +321,7 @@ def test_table_relationships(table):
         result = table.to_dict(include_relationships=True)
         
         relationships = result.get('relationships', {})
-        print(f"✓ Relationships introspection succeeded")
+        print("✓ Relationships introspection succeeded")
         print(f"  Relationships found: {list(relationships.keys())}")
         
         if 'parent_graphic_frame' in relationships:
@@ -347,7 +347,7 @@ def test_format_for_llm(table):
         result_llm = table.to_dict(format_for_llm=True, expand_collections=False)
         result_raw = table.to_dict(format_for_llm=False, expand_collections=False)
         
-        print(f"✓ LLM formatting test succeeded")
+        print("✓ LLM formatting test succeeded")
         print(f"  With format_for_llm=True: {len(json.dumps(result_llm))} chars")
         print(f"  With format_for_llm=False: {len(json.dumps(result_raw))} chars")
         
@@ -389,7 +389,7 @@ def run_comprehensive_analysis(table):
         props = result['properties']
         rows = props['rows']
         
-        print(f"\nTable Structure Analysis:")
+        print("\nTable Structure Analysis:")
         print(f"  Dimensions: {len(rows)} rows x {len(rows[0]) if rows else 0} columns")
         
         # Analyze formatting
@@ -400,7 +400,7 @@ def run_comprehensive_analysis(table):
         print(f"  Active formatting: {', '.join(formatting_features) if formatting_features else 'None'}")
         
         # Cell content analysis
-        print(f"\nCell Content Analysis:")
+        print("\nCell Content Analysis:")
         total_cells = 0
         cells_with_content = 0
         merge_origins = 0
@@ -433,7 +433,7 @@ def run_comprehensive_analysis(table):
         
         # JSON size analysis
         json_size = len(json.dumps(result))
-        print(f"\nSerialization Analysis:")
+        print("\nSerialization Analysis:")
         print(f"  Full JSON size: {json_size:,} characters")
         print(f"  Estimated size per cell: {json_size // total_cells if total_cells > 0 else 0} chars")
         
