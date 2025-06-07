@@ -128,9 +128,25 @@ if __name__ == "__main__":
 
 ## Testing Strategy
 
+### Clean MEP-Organized Test Structure
+
+The test suite is organized by MEP (MCP Enhancement Proposal) for clarity and maintainability:
+
+#### **Unit Tests (by MEP)**
+- `test_mep001_server_bootstrap.py` - MEP-001: Server initialization, get_info tool
+- `test_mep002_execute_tool.py` - MEP-002: execute_python_code tool (updated for MEP-003)
+- `test_mep003_roots_resources.py` - MEP-003: Root management, resource endpoints
+
+#### **Live Tests (by MEP)**  
+- `live_test_mep001_mep002.py` - End-to-end tests for server + tools
+- `live_test_mep003.py` - End-to-end tests for roots/resources
+
+#### **Demo/Utility**
+- `demo_execute_python_code.py` - Demo script for execute_python_code tool
+
 ### Three-Tier Testing Approach
 
-#### 1. Unit Tests (`test_server.py`)
+#### 1. Unit Tests (MEP-organized)
 ```python
 @pytest.mark.asyncio
 async def test_tool_functionality():
@@ -140,11 +156,12 @@ async def test_tool_functionality():
         assert "expected" in result
 ```
 
-**Focus:** Tool logic, error handling, edge cases
+**Focus:** Tool logic, error handling, edge cases per MEP
 **Speed:** Fast (< 1 second)
-**Scope:** Individual functions
+**Scope:** Individual functions/components
+**Files:** `test_mep001_*.py`, `test_mep002_*.py`, `test_mep003_*.py`
 
-#### 2. Live MCP Tests (`live_test_mcp_server.py`)
+#### 2. Live MCP Tests (MEP-organized)
 ```python
 async def test_mcp_protocol():
     """Test actual MCP client-server communication."""
@@ -160,9 +177,10 @@ async def test_mcp_protocol():
             # Validate protocol compliance
 ```
 
-**Focus:** Protocol compliance, client-server interaction
+**Focus:** Protocol compliance, client-server interaction per MEP
 **Speed:** Medium (2-5 seconds)
 **Scope:** Full server integration
+**Files:** `live_test_mep001_mep002.py`, `live_test_mep003.py`
 
 #### 3. Manual Testing
 ```bash
@@ -177,6 +195,43 @@ mcp install mcp_server/server/main.py
 **Speed:** Interactive
 **Scope:** End-to-end validation
 
+### Running Tests by MEP
+
+```bash
+# Run all unit tests
+source venv/bin/activate && python -m pytest mcp_server/tests/test_mep*.py -v
+
+# Run tests by specific MEP
+python -m pytest mcp_server/tests/test_mep001_server_bootstrap.py -v
+python -m pytest mcp_server/tests/test_mep002_execute_tool.py -v  
+python -m pytest mcp_server/tests/test_mep003_roots_resources.py -v
+
+# Run all live tests
+python mcp_server/tests/live_test_mep001_mep002.py
+python mcp_server/tests/live_test_mep003.py
+
+# Run specific test category
+python -m pytest mcp_server/tests/ -k "test_mep001" -v  # MEP-001 only
+python -m pytest mcp_server/tests/ -k "test_mep003" -v  # MEP-003 only
+```
+
+### Test Coverage by MEP
+
+#### MEP-001 (10 tests)
+- Server initialization and configuration
+- get_info tool functionality and error handling
+- Async functionality validation
+
+#### MEP-002 (8 tests) 
+- execute_python_code tool with MEP-003 signature
+- Python execution, error handling, context injection
+- Security and performance validation
+
+#### MEP-003 (14 tests)
+- Root management and presentation auto-loading
+- Resource discovery and tree-based content reading
+- Integration with MCP resource model
+
 ### Testing Best Practices
 
 1. **Always Test Protocol Compliance**
@@ -186,7 +241,7 @@ mcp install mcp_server/server/main.py
 
 2. **Mock External Dependencies**
    - File system access
-   - Network calls
+   - Network calls  
    - Complex object creation
 
 3. **Test Error Scenarios**
@@ -194,6 +249,11 @@ mcp install mcp_server/server/main.py
    - Permission errors
    - Invalid inputs
    - Protocol violations
+
+4. **MEP-Specific Testing**
+   - Each MEP builds on previous ones
+   - Test backwards compatibility when updating
+   - Maintain separate test files for clear responsibility
 
 ## Common Issues & Solutions
 
@@ -255,26 +315,36 @@ async def get_presentation_info() -> str:
 git checkout -b mep-XXX-tool-name
 
 # Implement server changes
-# 1. Add tool to main.py
-# 2. Create comprehensive tests
+# 1. Add tool/resource to main.py
+# 2. Create MEP-specific test files
 # 3. Update documentation
 
-# Test thoroughly
-python -m pytest mcp_server/tests/ -v
-python mcp_server/tests/live_test_mcp_server.py
+# Test thoroughly (MEP-organized)
+python -m pytest mcp_server/tests/test_mepXXX_*.py -v
+python mcp_server/tests/live_test_mepXXX.py
 ```
 
-### 3. Validation Phase
-- Unit tests: 100% pass rate required
+### 3. Testing Phase (MEP-Organized)
+```bash
+# Create MEP-specific test files:
+# test_mepXXX_feature_name.py - Unit tests for the MEP
+# live_test_mepXXX.py - Live protocol tests for the MEP
+
+# Ensure backwards compatibility
+python -m pytest mcp_server/tests/ -v  # All MEPs should pass
+```
+
+### 4. Validation Phase
+- Unit tests: 100% pass rate required for the MEP
 - Live tests: Full MCP protocol compliance
 - Manual testing: Real client interaction
-- Error scenario testing: Graceful degradation
+- Backwards compatibility: Previous MEP tests still pass
 
-### 4. Documentation Phase
-- Update tool descriptions for AI clarity
-- Document any new patterns or learnings
+### 5. Documentation Phase
+- Update tool/resource descriptions for AI clarity
+- Document any new patterns or learnings in mcp_server/CLAUDE.md
 - Update ROADMAP_MEP.md progress
-- Include test results in PR
+- Include test results organized by MEP in PR
 
 ## Debugging Guide
 
