@@ -73,30 +73,27 @@ class ExecutePythonCodeDemo:
         except json.JSONDecodeError:
             print(f"   ❌ Invalid JSON response: {result_json[:100]}...")
 
-    async def demo_successful_execution(self, session):
-        """Demonstrate successful code execution."""
-        self.print_banner("Demo 1: Successful Code Execution")
+    async def demo_no_presentation_behavior(self, session):
+        """Demonstrate expected behavior when no presentation is loaded."""
+        self.print_banner("Demo 1: No Presentation Loaded Behavior (Expected)")
         
-        # Basic presentation info
+        print("📝 Note: This demo shows the expected behavior when no presentation is loaded.")
+        print("   In a real scenario, an MCP client would set roots containing .pptx files")
+        print("   through the MCP protocol, and the server would automatically load them.")
+        print("")
+        
+        # Test behavior with no presentation
         code1 = """
-print("=== Presentation Overview ===")
-print(f"Number of slides: {len(prs.slides)}")
-print(f"Number of slide masters: {len(prs.slide_masters)}")
-print(f"Slide layouts available: {len(prs.slide_layouts)}")
-
-# Show first slide info if available
-if prs.slides:
-    slide = prs.slides[0]
-    print(f"\\nFirst slide has {len(slide.shapes)} shapes")
+print("=== Checking for presentation ===")
+print("This code would access 'prs' if a presentation was loaded.")
 """
         
         result = await session.call_tool("execute_python_code", arguments={
-            "code": code1,
-            "file_path": str(self.test_file)
+            "code": code1
         })
         
         if result.content:
-            self.print_result(result.content[0].text, "Basic presentation information")
+            self.print_result(result.content[0].text, "No presentation behavior")
 
     async def demo_introspection_capabilities(self, session):
         """Demonstrate introspection capabilities."""
@@ -130,8 +127,7 @@ if prs.slides:
 """
         
         result = await session.call_tool("execute_python_code", arguments={
-            "code": code2,
-            "file_path": str(self.test_file)
+            "code": code2
         })
         
         if result.content:
@@ -302,7 +298,7 @@ print("\\n🎉 Workflow completed successfully!")
                     await session.initialize()
 
                     # Run all demos
-                    await self.demo_successful_execution(session)
+                    await self.demo_no_presentation_behavior(session)
                     await self.demo_introspection_capabilities(session)
                     await self.demo_error_handling(session)
                     await self.demo_advanced_operations(session)

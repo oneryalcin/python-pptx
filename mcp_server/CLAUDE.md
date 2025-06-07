@@ -227,10 +227,30 @@ python -m pytest mcp_server/tests/ -k "test_mep003" -v  # MEP-003 only
 - Python execution, error handling, context injection
 - Security and performance validation
 
-#### MEP-003 (14 tests)
+#### MEP-003 (20 tests)
 - Root management and presentation auto-loading
-- Resource discovery and tree-based content reading
+- Resource discovery and tree-based content reading  
 - Integration with MCP resource model
+- Session management and cleanup functionality
+- Edge cases and validation testing
+
+#### MEP-004 (14 tests)
+- Save and Save As tool functionality
+- Path validation and security controls
+- Session state management for save operations
+- Error handling for permission and directory issues
+
+### Test Coverage Enhancements
+
+The test suite has undergone significant enhancements, particularly for MEP-003:
+
+**MEP-003 Test Restoration (PR #57)**:
+- **Before**: 5 working tests + 9 commented-out tests = 35% functional coverage
+- **After**: 20 comprehensive working tests = 100% functional coverage  
+- **Additions**: Session management testing, edge cases, complex scenarios
+- **Architecture**: Full session-based architecture validation
+
+This enhancement restored all test cases that were temporarily commented out during the modular architecture refactoring and added significant new capabilities for testing session isolation, cleanup, and edge cases.
 
 ### Testing Best Practices
 

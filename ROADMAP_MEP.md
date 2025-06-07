@@ -42,7 +42,7 @@ These MEPs establish the basic server and its primary interaction tools.
         6.  ✅ Comprehensive error handling for syntax errors, runtime errors, and file issues.
         7.  ✅ Context injection includes `prs`, `pptx` module, `Path`, and `print` function.
     *   **MCP Concepts Used:** Tools, FastMCP framework.
-    *   **Test Results:** 21/21 unit tests passing, 7/7 live tests passing (100% success rate).
+    *   **Test Results:** 8/8 unit tests passing, 7/7 live tests passing (100% success rate).
     *   **Priority:** **CRITICAL.** This is the agent's "hands."
 
 *   **MEP-003: Root and Resource Management** ✅ **COMPLETED**
@@ -55,7 +55,7 @@ These MEPs establish the basic server and its primary interaction tools.
         5.  ✅ **Security:** Maintains file path validation and prevents directory traversal.
         6.  ✅ Context injection now includes `json` module for easier data formatting.
     *   **MCP Concepts Used:** Roots, Resources (via @mcp.resource decorator), session management.
-    *   **Test Results:** 21/21 unit tests passing, 7/7 live tests passing (100% success rate after architectural fixes).
+    *   **Test Results:** 20/20 unit tests passing (enhanced from 5 working tests), 5/5 live tests passing (100% success rate after architectural fixes). Includes comprehensive session management, edge cases, and validation testing.
     *   **Priority:** **CRITICAL.** This makes the server dynamic, secure, and user-configurable.
 
 *   **MEP-004: Unified "Save" and "Save As" Tool** ✅ **COMPLETED**
