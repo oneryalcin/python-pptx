@@ -100,7 +100,7 @@ More information is available in the `python-pptx documentation`_.
 
 * **get_info()**: Essential onboarding providing usage patterns and examples (agents must call this first)
 * **execute_python_code(code: str)**: Execute Python code with pre-loaded presentation object (``prs``)
-* **save_presentation(output_path: str = None)**: Save presentation to original location or new path
+* **save_presentation(output_path: str = None)**: Save presentation to original location or new path (parent directory must exist)
 
 **Available Resources:**
 

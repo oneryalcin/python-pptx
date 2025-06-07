@@ -167,7 +167,7 @@ class TestSavePresentationTool:
         with patch('main.pptx', MagicMock()), \
              patch('main._validate_output_path', return_value=(True, "")), \
              patch('main._cleanup_expired_sessions'), \
-             patch('pathlib.Path.mkdir'):
+             patch.object(Path, 'exists', return_value=True):  # Mock parent directory exists
             
             result = await save_presentation()
             
@@ -188,11 +188,7 @@ class TestSavePresentationTool:
         with patch('main.pptx', MagicMock()), \
              patch('main._validate_output_path', return_value=(True, "")), \
              patch('main._cleanup_expired_sessions'), \
-             patch.object(Path, 'parent') as mock_parent, \
-             patch.object(Path, 'mkdir'):
-            
-            # Mock the parent.mkdir call
-            mock_parent.mkdir = MagicMock()
+             patch.object(Path, 'exists', return_value=True):  # Mock parent directory exists
             
             result = await save_presentation(output_path)
             
@@ -231,10 +227,7 @@ class TestSavePresentationTool:
         with patch('main.pptx', MagicMock()), \
              patch('main._validate_output_path', return_value=(True, "")), \
              patch('main._cleanup_expired_sessions'), \
-             patch.object(Path, 'parent') as mock_parent:
-            
-            # Mock the parent.mkdir call
-            mock_parent.mkdir = MagicMock()
+             patch.object(Path, 'exists', return_value=True):  # Mock parent directory exists
             
             # Mock save to raise PermissionError
             mock_session.loaded_presentation.save.side_effect = PermissionError("Access denied")
@@ -252,10 +245,7 @@ class TestSavePresentationTool:
         with patch('main.pptx', MagicMock()), \
              patch('main._validate_output_path', return_value=(True, "")), \
              patch('main._cleanup_expired_sessions'), \
-             patch.object(Path, 'parent') as mock_parent:
-            
-            # Mock the parent.mkdir call
-            mock_parent.mkdir = MagicMock()
+             patch.object(Path, 'exists', return_value=True):  # Mock parent directory exists
             
             # Mock save to raise general exception
             mock_session.loaded_presentation.save.side_effect = Exception("Disk full")
@@ -269,24 +259,22 @@ class TestSavePresentationTool:
             assert "Disk full" in data["error"]
     
     @pytest.mark.asyncio
-    async def test_save_presentation_directory_creation_error(self, mock_session):
-        """Test save_presentation when directory creation fails."""
-        output_path = "/test/root/new/folder/output.pptx"
+    async def test_save_presentation_directory_does_not_exist(self, mock_session):
+        """Test save_presentation when parent directory does not exist."""
+        output_path = "/test/root/nonexistent/folder/output.pptx"
         
         with patch('main.pptx', MagicMock()), \
              patch('main._validate_output_path', return_value=(True, "")), \
              patch('main._cleanup_expired_sessions'), \
-             patch.object(Path, 'parent') as mock_parent:
-            
-            # Mock mkdir to raise exception
-            mock_parent.mkdir.side_effect = OSError("Cannot create directory")
+             patch.object(Path, 'exists', return_value=False):  # Mock parent directory doesn't exist
             
             result = await save_presentation(output_path)
             
             data = json.loads(result)
             assert data["success"] is False
             assert data["operation"] == "save_as"
-            assert "Failed to create target directory" in data["error"]
+            assert "Parent directory does not exist" in data["error"]
+            assert "Please ensure the directory exists before saving" in data["error"]
     
     @pytest.mark.asyncio
     async def test_save_presentation_no_original_path(self):
@@ -323,10 +311,7 @@ class TestExecutionTime:
         with patch('main.pptx', MagicMock()), \
              patch('main._validate_output_path', return_value=(True, "")), \
              patch('main._cleanup_expired_sessions'), \
-             patch.object(Path, 'parent') as mock_parent:
-            
-            # Mock the parent.mkdir call
-            mock_parent.mkdir = MagicMock()
+             patch.object(Path, 'exists', return_value=True):  # Mock parent directory exists
             
             result = await save_presentation()
             

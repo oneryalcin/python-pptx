@@ -355,8 +355,11 @@ async def save_presentation(output_path: Optional[str] = None) -> str:
     If output_path is provided, saves to the new location (Save As operation).
     All output paths must be within the client-configured root directories for security.
     
+    IMPORTANT: The parent directory of the output path must already exist. This tool will not create directories.
+    
     Args:
         output_path: Optional path where to save the presentation. If None, saves to original location.
+                    The parent directory must exist.
         
     Returns:
         JSON string with save operation results including success status and file path
@@ -418,15 +421,13 @@ async def save_presentation(output_path: Optional[str] = None) -> str:
             "execution_time": time.time() - start_time
         })
     
-    # Ensure the target directory exists
-    try:
-        target_path.parent.mkdir(parents=True, exist_ok=True)
-    except Exception as e:
+    # Validate that the target directory exists (no automatic creation per specification)
+    if not target_path.parent.exists():
         return json.dumps({
             "success": False,
             "operation": operation,
             "file_path": str(target_path),
-            "error": f"Failed to create target directory: {str(e)}",
+            "error": f"Parent directory does not exist: {target_path.parent}. Please ensure the directory exists before saving.",
             "execution_time": time.time() - start_time
         })
     

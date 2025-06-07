@@ -220,26 +220,25 @@ else:
         
         return response_data
     
-    async def test_save_with_subdirectory(self, session):
-        """Test saving to subdirectory (should create directory)."""
-        # Define a path in a subdirectory
-        subdir_path = str(self.temp_dir / "subfolder" / "nested_save.pptx")
+    async def test_save_with_nonexistent_subdirectory(self, session):
+        """Test saving to nonexistent subdirectory (should fail per specification)."""
+        # Define a path in a subdirectory that doesn't exist
+        subdir_path = str(self.temp_dir / "nonexistent_subfolder" / "nested_save.pptx")
         
         result = await session.call_tool("save_presentation", {"output_path": subdir_path})
         
         response_data = json.loads(result.content[0].text)
         
-        print(f"Save with subdirectory result: {response_data}")
+        print(f"Save with nonexistent subdirectory result: {response_data}")
         
         # Check response structure
         assert "success" in response_data
         assert "operation" in response_data
         
-        if response_data["success"]:
-            # Verify directory and file were created
-            assert Path(subdir_path).parent.exists(), "Subdirectory not created"
-            assert Path(subdir_path).exists(), "File not created in subdirectory"
-            print(f"✅ File successfully created in subdirectory: {subdir_path}")
+        # Without a loaded presentation, this will fail with "no presentation" error
+        # In a real scenario with a loaded presentation, it would fail with "directory does not exist"
+        assert response_data["success"] is False
+        assert "No PowerPoint presentation loaded" in response_data["error"]
         
         return response_data
     
@@ -284,7 +283,7 @@ async def main():
         await tester.run_mcp_test("Save to Original Path", tester.test_save_to_original_path)
         await tester.run_mcp_test("Save As New Path", tester.test_save_as_new_path)
         await tester.run_mcp_test("Save Outside Root (Security)", tester.test_save_outside_root)
-        await tester.run_mcp_test("Save with Subdirectory", tester.test_save_with_subdirectory)
+        await tester.run_mcp_test("Save with Nonexistent Subdirectory", tester.test_save_with_nonexistent_subdirectory)
         
         # Print summary
         tester.print_summary()
