@@ -13,7 +13,7 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from mcp_server.server.main import execute_python_code
+from mcp_server.server.tools import execute_python_code
 
 
 class TestExecutePythonCodeTool:
@@ -22,7 +22,7 @@ class TestExecutePythonCodeTool:
     @pytest.mark.asyncio
     async def test_execute_python_code_missing_pptx_library(self):
         """Test execute_python_code when pptx library is not available."""
-        with patch('mcp_server.server.main.pptx', None):
+        with patch('mcp_server.server.tools.pptx', None):
             result = await execute_python_code("print('test')")
             
             result_data = json.loads(result)
@@ -32,11 +32,11 @@ class TestExecutePythonCodeTool:
     @pytest.mark.asyncio
     async def test_execute_python_code_no_presentation_loaded(self):
         """Test execute_python_code with no presentation loaded."""
-        with patch('mcp_server.server.main.pptx', Mock()):
+        with patch('mcp_server.server.tools.pptx', Mock()):
             # Mock session with no presentation loaded
             mock_session = Mock()
             mock_session.loaded_presentation = None
-            with patch('mcp_server.server.main._get_session', return_value=mock_session):
+            with patch('mcp_server.server.tools.get_session', return_value=mock_session):
                 result = await execute_python_code("print('test')")
                 
                 result_data = json.loads(result)
@@ -47,11 +47,11 @@ class TestExecutePythonCodeTool:
     async def test_execute_python_code_syntax_error(self):
         """Test execute_python_code with Python syntax error."""
         mock_presentation = Mock()
-        with patch('mcp_server.server.main.pptx', Mock()):
+        with patch('mcp_server.server.tools.pptx', Mock()):
             # Mock session with presentation loaded
             mock_session = Mock()
             mock_session.loaded_presentation = mock_presentation
-            with patch('mcp_server.server.main._get_session', return_value=mock_session):
+            with patch('mcp_server.server.tools.get_session', return_value=mock_session):
                 result = await execute_python_code("if True print('test')")
                 
                 result_data = json.loads(result)
@@ -62,11 +62,11 @@ class TestExecutePythonCodeTool:
     async def test_execute_python_code_runtime_error(self):
         """Test execute_python_code with Python runtime error."""
         mock_presentation = Mock()
-        with patch('mcp_server.server.main.pptx', Mock()):
+        with patch('mcp_server.server.tools.pptx', Mock()):
             # Mock session with presentation loaded
             mock_session = Mock()
             mock_session.loaded_presentation = mock_presentation
-            with patch('mcp_server.server.main._get_session', return_value=mock_session):
+            with patch('mcp_server.server.tools.get_session', return_value=mock_session):
                 result = await execute_python_code("raise ValueError('test error')")
                 
                 result_data = json.loads(result)
@@ -84,11 +84,11 @@ print("Line 2")
 result = 2 + 2
 print(f"Result: {result}")
 """
-        with patch('mcp_server.server.main.pptx', Mock()):
+        with patch('mcp_server.server.tools.pptx', Mock()):
             # Mock session with presentation loaded
             mock_session = Mock()
             mock_session.loaded_presentation = mock_presentation
-            with patch('mcp_server.server.main._get_session', return_value=mock_session):
+            with patch('mcp_server.server.tools.get_session', return_value=mock_session):
                 result = await execute_python_code(code)
                 
                 result_data = json.loads(result)
@@ -109,11 +109,11 @@ print(f"Result: {result}")
 print(f"Presentation type: {type(prs)}")
 print(f"Slide count: {len(prs.slides)}")
 """
-        with patch('mcp_server.server.main.pptx', Mock()):
+        with patch('mcp_server.server.tools.pptx', Mock()):
             # Mock session with presentation loaded
             mock_session = Mock()
             mock_session.loaded_presentation = mock_presentation
-            with patch('mcp_server.server.main._get_session', return_value=mock_session):
+            with patch('mcp_server.server.tools.get_session', return_value=mock_session):
                 result = await execute_python_code(code)
                 
                 result_data = json.loads(result)
@@ -125,11 +125,11 @@ print(f"Slide count: {len(prs.slides)}")
     async def test_execute_python_code_has_execution_time(self):
         """Test that execute_python_code includes execution time in results."""
         mock_presentation = Mock()
-        with patch('mcp_server.server.main.pptx', Mock()):
+        with patch('mcp_server.server.tools.pptx', Mock()):
             # Mock session with presentation loaded
             mock_session = Mock()
             mock_session.loaded_presentation = mock_presentation
-            with patch('mcp_server.server.main._get_session', return_value=mock_session):
+            with patch('mcp_server.server.tools.get_session', return_value=mock_session):
                 result = await execute_python_code("print('test')")
                 
                 result_data = json.loads(result)
@@ -146,11 +146,11 @@ import sys
 print("This goes to stdout")
 print("This goes to stderr", file=sys.stderr)
 """
-        with patch('mcp_server.server.main.pptx', Mock()):
+        with patch('mcp_server.server.tools.pptx', Mock()):
             # Mock session with presentation loaded
             mock_session = Mock()
             mock_session.loaded_presentation = mock_presentation
-            with patch('mcp_server.server.main._get_session', return_value=mock_session):
+            with patch('mcp_server.server.tools.get_session', return_value=mock_session):
                 result = await execute_python_code(code)
                 
                 result_data = json.loads(result)
