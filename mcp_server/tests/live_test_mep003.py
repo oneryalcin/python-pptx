@@ -263,20 +263,21 @@ class MEP003Tester:
             test_pptx = self.create_test_presentation()
             
             # Import server functions for manual testing
-            from mcp_server.server.main import _set_client_roots, _loaded_presentation_path
+            from mcp_server.server.session import set_client_roots, get_session
             from mcp import types
             
             # Simulate setting client roots
             roots = [types.Root(uri=f"file://{test_pptx}")]
-            _set_client_roots(roots)
+            set_client_roots(roots)
             
             # Check if presentation was loaded
-            presentation_loaded = _loaded_presentation_path is not None
+            session = get_session()
+            presentation_loaded = session.loaded_presentation_path is not None
             
             self.log_test(
                 "Manual Root Simulation",
                 presentation_loaded,
-                f"Presentation loaded from: {_loaded_presentation_path}" if presentation_loaded else "",
+                f"Presentation loaded from: {session.loaded_presentation_path}" if presentation_loaded else "",
                 "Failed to load presentation from root" if not presentation_loaded else ""
             )
             

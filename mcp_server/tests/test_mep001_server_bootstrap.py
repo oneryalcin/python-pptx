@@ -16,7 +16,8 @@ from unittest.mock import MagicMock, PropertyMock, mock_open, patch
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from mcp_server.server.main import _INFO_DOC_PATH, get_info
+from mcp_server.server.config import INFO_DOC_PATH
+from mcp_server.server.tools import get_info
 
 
 class TestGetInfoTool:
@@ -41,7 +42,7 @@ class TestGetInfoTool:
             result = await get_info()
 
         assert "# Error: Information document not found" in result
-        assert str(_INFO_DOC_PATH) in result
+        assert str(INFO_DOC_PATH) in result
 
     @pytest.mark.asyncio
     async def test_get_info_permission_error(self):
@@ -91,13 +92,13 @@ class TestServerConfiguration:
     def test_info_doc_path_exists(self):
         """Test that the info document path is correctly defined."""
         expected_path = Path(__file__).parent.parent / "llm_info.md"
-        assert expected_path == _INFO_DOC_PATH
+        assert expected_path == INFO_DOC_PATH
 
     def test_info_doc_path_relative_structure(self):
         """Test that the path structure is correct relative to main.py."""
         # The path should point to mcp_server/llm_info.md from mcp_server/server/main.py
-        assert _INFO_DOC_PATH.name == "llm_info.md"
-        assert _INFO_DOC_PATH.parent.name == "mcp_server"
+        assert INFO_DOC_PATH.name == "llm_info.md"
+        assert INFO_DOC_PATH.parent.name == "mcp_server"
 
 
 class TestAsyncFunctionality:

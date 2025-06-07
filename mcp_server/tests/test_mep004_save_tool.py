@@ -16,21 +16,18 @@ from mcp import types
 # Import the server functions to test
 import sys
 import os
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'server'))
+PROJECT_ROOT = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
-from main import (
-    save_presentation,
-    _validate_output_path,
-    _get_session,
-    _set_client_roots,
-    SessionContext
-)
+from mcp_server.server.tools import save_presentation
+from mcp_server.server.validation import validate_output_path
+from mcp_server.server.session import get_session, set_client_roots, SessionContext
 
 
 @pytest.fixture
 def mock_session():
     """Create a mock session with default setup."""
-    with patch('main._get_session') as mock_get_session:
+    with patch('mcp_server.server.tools.get_session') as mock_get_session:
         # Create a mock presentation object
         mock_prs = MagicMock()
         mock_prs.save = MagicMock()
@@ -54,7 +51,7 @@ def mock_session():
 @pytest.fixture
 def mock_no_session():
     """Create a mock session with no presentation loaded."""
-    with patch('main._get_session') as mock_get_session:
+    with patch('mcp_server.server.tools.get_session') as mock_get_session:
         session = SessionContext(
             session_id="test-session",
             created_at=1234567890.0,
@@ -86,10 +83,11 @@ class TestPathValidation:
                 types.Root(uri=f"file://{temp_path}", name="test_root")
             ]
             
-            is_valid, error = _validate_output_path(output_path)
-            
-            assert is_valid is True
-            assert error == ""
+            with patch('mcp_server.server.validation.get_session', return_value=mock_session):
+                is_valid, error = validate_output_path(output_path)
+                
+                assert is_valid is True
+                assert error == ""
     
     def test_validate_output_path_outside_root(self, mock_session):
         """Test path validation for path outside root."""
@@ -99,15 +97,16 @@ class TestPathValidation:
         def mock_resolve(self):
             return self
             
-        with patch.object(Path, 'resolve', mock_resolve):
-            is_valid, error = _validate_output_path(output_path)
+        with patch.object(Path, 'resolve', mock_resolve), \
+             patch('mcp_server.server.validation.get_session', return_value=mock_session):
+            is_valid, error = validate_output_path(output_path)
             
             assert is_valid is False
             assert "not within any configured client root" in error
     
     def test_validate_output_path_no_roots(self):
         """Test path validation when no client roots are configured."""
-        with patch('main._get_session') as mock_get_session:
+        with patch('mcp_server.server.validation.get_session') as mock_get_session:
             session = SessionContext(
                 session_id="test-session",
                 created_at=1234567890.0,
@@ -119,7 +118,7 @@ class TestPathValidation:
             mock_get_session.return_value = session
             
             output_path = Path("/test/output.pptx")
-            is_valid, error = _validate_output_path(output_path)
+            is_valid, error = validate_output_path(output_path)
             
             assert is_valid is False
             assert "No client roots configured" in error
@@ -131,8 +130,9 @@ class TestPathValidation:
         def mock_resolve_error(self):
             raise OSError("Invalid path")
             
-        with patch.object(Path, 'resolve', mock_resolve_error):
-            is_valid, error = _validate_output_path(output_path)
+        with patch.object(Path, 'resolve', mock_resolve_error), \
+             patch('mcp_server.server.validation.get_session', return_value=mock_session):
+            is_valid, error = validate_output_path(output_path)
             
             assert is_valid is False
             assert "Invalid output path" in error
@@ -144,7 +144,7 @@ class TestSavePresentationTool:
     @pytest.mark.asyncio
     async def test_save_presentation_no_pptx(self):
         """Test save_presentation when python-pptx is not available."""
-        with patch('main.pptx', None):
+        with patch('mcp_server.server.tools.pptx', None):
             result = await save_presentation()
             
             data = json.loads(result)
@@ -154,7 +154,7 @@ class TestSavePresentationTool:
     @pytest.mark.asyncio
     async def test_save_presentation_no_loaded_presentation(self, mock_no_session):
         """Test save_presentation when no presentation is loaded."""
-        with patch('main.pptx', MagicMock()):
+        with patch('mcp_server.server.tools.pptx', MagicMock()):
             result = await save_presentation()
             
             data = json.loads(result)
@@ -164,9 +164,9 @@ class TestSavePresentationTool:
     @pytest.mark.asyncio
     async def test_save_presentation_success_original_path(self, mock_session):
         """Test successful save to original path (Save operation)."""
-        with patch('main.pptx', MagicMock()), \
-             patch('main._validate_output_path', return_value=(True, "")), \
-             patch('main._cleanup_expired_sessions'), \
+        with patch('mcp_server.server.tools.pptx', MagicMock()), \
+             patch('mcp_server.server.tools.validate_output_path', return_value=(True, "")), \
+             patch('mcp_server.server.tools.cleanup_expired_sessions'), \
              patch.object(Path, 'exists', return_value=True):  # Mock parent directory exists
             
             result = await save_presentation()
@@ -185,9 +185,9 @@ class TestSavePresentationTool:
         """Test successful save to new path (Save As operation)."""
         output_path = "/test/root/new_presentation.pptx"
         
-        with patch('main.pptx', MagicMock()), \
-             patch('main._validate_output_path', return_value=(True, "")), \
-             patch('main._cleanup_expired_sessions'), \
+        with patch('mcp_server.server.tools.pptx', MagicMock()), \
+             patch('mcp_server.server.tools.validate_output_path', return_value=(True, "")), \
+             patch('mcp_server.server.tools.cleanup_expired_sessions'), \
              patch.object(Path, 'exists', return_value=True):  # Mock parent directory exists
             
             result = await save_presentation(output_path)
@@ -209,9 +209,9 @@ class TestSavePresentationTool:
         """Test save_presentation when path validation fails."""
         output_path = "/outside/root/output.pptx"
         
-        with patch('main.pptx', MagicMock()), \
-             patch('main._validate_output_path', return_value=(False, "Path outside root")), \
-             patch('main._cleanup_expired_sessions'):
+        with patch('mcp_server.server.tools.pptx', MagicMock()), \
+             patch('mcp_server.server.tools.validate_output_path', return_value=(False, "Path outside root")), \
+             patch('mcp_server.server.tools.cleanup_expired_sessions'):
             
             result = await save_presentation(output_path)
             
@@ -224,9 +224,9 @@ class TestSavePresentationTool:
     @pytest.mark.asyncio
     async def test_save_presentation_permission_error(self, mock_session):
         """Test save_presentation when permission error occurs."""
-        with patch('main.pptx', MagicMock()), \
-             patch('main._validate_output_path', return_value=(True, "")), \
-             patch('main._cleanup_expired_sessions'), \
+        with patch('mcp_server.server.tools.pptx', MagicMock()), \
+             patch('mcp_server.server.tools.validate_output_path', return_value=(True, "")), \
+             patch('mcp_server.server.tools.cleanup_expired_sessions'), \
              patch.object(Path, 'exists', return_value=True):  # Mock parent directory exists
             
             # Mock save to raise PermissionError
@@ -242,9 +242,9 @@ class TestSavePresentationTool:
     @pytest.mark.asyncio
     async def test_save_presentation_general_error(self, mock_session):
         """Test save_presentation when general error occurs during save."""
-        with patch('main.pptx', MagicMock()), \
-             patch('main._validate_output_path', return_value=(True, "")), \
-             patch('main._cleanup_expired_sessions'), \
+        with patch('mcp_server.server.tools.pptx', MagicMock()), \
+             patch('mcp_server.server.tools.validate_output_path', return_value=(True, "")), \
+             patch('mcp_server.server.tools.cleanup_expired_sessions'), \
              patch.object(Path, 'exists', return_value=True):  # Mock parent directory exists
             
             # Mock save to raise general exception
@@ -263,9 +263,9 @@ class TestSavePresentationTool:
         """Test save_presentation when parent directory does not exist."""
         output_path = "/test/root/nonexistent/folder/output.pptx"
         
-        with patch('main.pptx', MagicMock()), \
-             patch('main._validate_output_path', return_value=(True, "")), \
-             patch('main._cleanup_expired_sessions'), \
+        with patch('mcp_server.server.tools.pptx', MagicMock()), \
+             patch('mcp_server.server.tools.validate_output_path', return_value=(True, "")), \
+             patch('mcp_server.server.tools.cleanup_expired_sessions'), \
              patch.object(Path, 'exists', return_value=False):  # Mock parent directory doesn't exist
             
             result = await save_presentation(output_path)
@@ -279,9 +279,9 @@ class TestSavePresentationTool:
     @pytest.mark.asyncio
     async def test_save_presentation_no_original_path(self):
         """Test save_presentation when no original path is available for Save operation."""
-        with patch('main._get_session') as mock_get_session, \
-             patch('main.pptx', MagicMock()), \
-             patch('main._cleanup_expired_sessions'):
+        with patch('mcp_server.server.tools.get_session') as mock_get_session, \
+             patch('mcp_server.server.tools.pptx', MagicMock()), \
+             patch('mcp_server.server.tools.cleanup_expired_sessions'):
             
             # Create session with presentation but no path
             session = SessionContext(
@@ -308,9 +308,9 @@ class TestExecutionTime:
     @pytest.mark.asyncio
     async def test_save_presentation_includes_execution_time(self, mock_session):
         """Test that save_presentation includes execution_time in response."""
-        with patch('main.pptx', MagicMock()), \
-             patch('main._validate_output_path', return_value=(True, "")), \
-             patch('main._cleanup_expired_sessions'), \
+        with patch('mcp_server.server.tools.pptx', MagicMock()), \
+             patch('mcp_server.server.tools.validate_output_path', return_value=(True, "")), \
+             patch('mcp_server.server.tools.cleanup_expired_sessions'), \
              patch.object(Path, 'exists', return_value=True):  # Mock parent directory exists
             
             result = await save_presentation()
