@@ -151,7 +151,7 @@ More information is available in the `python-pptx documentation`_.
 **Testing & Reliability:**
 
 * **100% Test Coverage**: All tools and features comprehensively tested
-* **35+ Unit Tests**: Fast, isolated testing of individual components  
+* **52 Unit Tests**: Fast, isolated testing of individual components with comprehensive session management coverage
 * **Live Protocol Tests**: End-to-end MCP client-server communication validation
 * **Demo Scripts**: Interactive demonstrations of all capabilities
 
