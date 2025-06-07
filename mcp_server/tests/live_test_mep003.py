@@ -162,8 +162,8 @@ class MEP003Tester:
             )
             return False
 
-    async def test_list_resources_empty(self) -> bool:
-        """Test listing resources when no presentation is loaded."""
+    async def test_list_resources_available(self) -> bool:
+        """Test listing resources - presentation resource should always be available."""
         try:
             server_params = StdioServerParameters(
                 command=sys.executable,
@@ -174,22 +174,34 @@ class MEP003Tester:
                 async with ClientSession(read, write) as session:
                     await session.initialize()
                     
-                    # Try to list resources (should be empty initially)
+                    # List resources - presentation resource should be available
                     try:
                         resources = await session.list_resources()
                         resource_count = len(resources.resources)
                         
-                        self.log_test(
-                            "List Resources (Empty)",
-                            resource_count == 0,
-                            f"Found {resource_count} resources (expected 0)",
-                            f"Expected no resources, but found {resource_count}" if resource_count > 0 else ""
+                        # Check what resources we actually have
+                        resource_uris = [str(resource.uri) for resource in resources.resources]
+                        print(f"        Debug: Found resource URIs: {resource_uris}")
+                        
+                        # Check if we have the expected pptx://presentation resource
+                        has_presentation_resource = any(
+                            str(resource.uri) == "pptx://presentation" 
+                            for resource in resources.resources
                         )
-                        return resource_count == 0
+                        
+                        success = resource_count == 1 and has_presentation_resource
+                        
+                        self.log_test(
+                            "List Resources (Available)",
+                            success,
+                            f"Found {resource_count} resources: {resource_uris}, has presentation resource: {has_presentation_resource}",
+                            f"Expected 1 resource (pptx://presentation), found {resource_count} with URIs: {resource_uris}" if not success else ""
+                        )
+                        return success
                         
                     except Exception as inner_e:
                         self.log_test(
-                            "List Resources (Empty)",
+                            "List Resources (Available)",
                             False,
                             error=f"Failed to list resources: {str(inner_e)}"
                         )
@@ -197,7 +209,7 @@ class MEP003Tester:
                     
         except Exception as e:
             self.log_test(
-                "List Resources (Empty)",
+                "List Resources (Available)",
                 False,
                 error=f"Failed to connect to server: {str(e)}"
             )
@@ -303,8 +315,8 @@ class MEP003Tester:
             # Test 2: Resource capabilities
             await self.test_resource_capabilities()
             
-            # Test 3: List resources (empty)
-            await self.test_list_resources_empty()
+            # Test 3: List resources (available)
+            await self.test_list_resources_available()
             
             # Test 4: Execute Python code without presentation
             await self.test_execute_python_code_no_presentation()
