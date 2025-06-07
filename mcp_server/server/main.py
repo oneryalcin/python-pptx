@@ -2,7 +2,7 @@
 MCP server for python-pptx agentic toolkit.
 
 This server provides AI agents with access to python-pptx library capabilities
-through the Model Context Protocol (MCP). Implements MEP-004: Unified Save and Save As Tool.
+through the Model Context Protocol (MCP). Implements MEP-006: The Feedback Loop (provide_feedback Tool).
 
 Features:
 - Automatic presentation loading from client roots
@@ -13,31 +13,27 @@ Features:
 """
 
 from mcp.server import FastMCP
-from mcp import types
 
 try:
     # Try relative imports first (when imported as module)
     from .config import SERVER_NAME
     from .session import set_client_roots
-    from .tools import (
-        get_info as get_info_impl, 
-        execute_python_code as execute_python_code_impl, 
-        save_presentation as save_presentation_impl, 
-        get_presentation_tree as get_presentation_tree_impl
-    )
+    from .tools import execute_python_code as execute_python_code_impl
+    from .tools import get_info as get_info_impl
+    from .tools import get_presentation_tree as get_presentation_tree_impl
+    from .tools import provide_feedback as provide_feedback_impl
+    from .tools import save_presentation as save_presentation_impl
 except ImportError:
     # Fall back to absolute imports (when run as script)
     import sys
     from pathlib import Path
     sys.path.insert(0, str(Path(__file__).parent.parent.parent))
     from mcp_server.server.config import SERVER_NAME
-    from mcp_server.server.session import set_client_roots
-    from mcp_server.server.tools import (
-        get_info as get_info_impl, 
-        execute_python_code as execute_python_code_impl, 
-        save_presentation as save_presentation_impl, 
-        get_presentation_tree as get_presentation_tree_impl
-    )
+    from mcp_server.server.tools import execute_python_code as execute_python_code_impl
+    from mcp_server.server.tools import get_info as get_info_impl
+    from mcp_server.server.tools import get_presentation_tree as get_presentation_tree_impl
+    from mcp_server.server.tools import provide_feedback as provide_feedback_impl
+    from mcp_server.server.tools import save_presentation as save_presentation_impl
 
 # Initialize the FastMCP server
 mcp = FastMCP(SERVER_NAME)
@@ -65,6 +61,14 @@ async def save_presentation(output_path: str = None) -> str:
     Save the currently loaded PowerPoint presentation to disk. Supports both 'Save' and 'Save As' operations.
     """
     return await save_presentation_impl(output_path)
+
+
+@mcp.tool()
+async def provide_feedback(feedback_text: str, is_success: bool, missing_capability: str = None) -> str:
+    """
+    Provide structured feedback about the success or failure of tasks, helping improve the system over time.
+    """
+    return await provide_feedback_impl(feedback_text, is_success, missing_capability)
 
 
 @mcp.resource("pptx://presentation")
