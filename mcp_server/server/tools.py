@@ -8,6 +8,7 @@ Each tool provides specific functionality for AI agents to interact with PowerPo
 import contextlib
 import io
 import json
+import sys
 import time
 from pathlib import Path
 from typing import Optional
@@ -18,7 +19,7 @@ except ImportError:
     pptx = None
 
 from .config import INFO_DOC_PATH
-from .session import get_session, cleanup_expired_sessions
+from .session import cleanup_expired_sessions, get_session
 from .validation import validate_output_path
 
 
@@ -67,13 +68,13 @@ async def execute_python_code(code: str) -> str:
         JSON string with execution results including stdout, stderr, and any errors
     """
     start_time = time.time()
-    
+
     # Clean up expired sessions periodically
     cleanup_expired_sessions()
-    
+
     # Get the current session
     session = get_session()
-    
+
     # Validate python-pptx is available
     if pptx is None:
         return json.dumps({
@@ -83,7 +84,7 @@ async def execute_python_code(code: str) -> str:
             "error": "python-pptx library is not available",
             "execution_time": time.time() - start_time
         })
-    
+
     # Check if a presentation is loaded in this session
     if session.loaded_presentation is None:
         return json.dumps({
@@ -93,10 +94,10 @@ async def execute_python_code(code: str) -> str:
             "error": "No PowerPoint presentation loaded. Ensure a .pptx file is available in the client roots.",
             "execution_time": time.time() - start_time
         })
-    
+
     # Use the session's pre-loaded presentation
     prs = session.loaded_presentation
-    
+
     # Prepare execution context
     exec_globals = {
         "__builtins__": __builtins__,
@@ -106,17 +107,17 @@ async def execute_python_code(code: str) -> str:
         "print": print, # Ensure print works
         "json": json,   # Make json available for output formatting
     }
-    
+
     # Capture stdout and stderr
     stdout_capture = io.StringIO()
     stderr_capture = io.StringIO()
-    
+
     try:
         with contextlib.redirect_stdout(stdout_capture), \
              contextlib.redirect_stderr(stderr_capture):
             # Execute the provided code
             exec(code, exec_globals)
-            
+
         return json.dumps({
             "success": True,
             "stdout": stdout_capture.getvalue(),
@@ -124,7 +125,7 @@ async def execute_python_code(code: str) -> str:
             "error": None,
             "execution_time": time.time() - start_time
         })
-        
+
     except SyntaxError as e:
         return json.dumps({
             "success": False,
@@ -133,7 +134,7 @@ async def execute_python_code(code: str) -> str:
             "error": f"Syntax error in Python code: {str(e)}",
             "execution_time": time.time() - start_time
         })
-        
+
     except Exception as e:
         return json.dumps({
             "success": False,
@@ -162,13 +163,13 @@ async def save_presentation(output_path: Optional[str] = None) -> str:
         JSON string with save operation results including success status and file path
     """
     start_time = time.time()
-    
+
     # Clean up expired sessions periodically
     cleanup_expired_sessions()
-    
+
     # Get the current session
     session = get_session()
-    
+
     # Validate python-pptx is available
     if pptx is None:
         return json.dumps({
@@ -178,7 +179,7 @@ async def save_presentation(output_path: Optional[str] = None) -> str:
             "error": "python-pptx library is not available",
             "execution_time": time.time() - start_time
         })
-    
+
     # Check if a presentation is loaded in this session
     if session.loaded_presentation is None:
         return json.dumps({
@@ -188,7 +189,7 @@ async def save_presentation(output_path: Optional[str] = None) -> str:
             "error": "No PowerPoint presentation loaded. Ensure a .pptx file is available in the client roots.",
             "execution_time": time.time() - start_time
         })
-    
+
     # Determine the target file path
     if output_path is None:
         # Save operation: use the original file path
@@ -206,7 +207,7 @@ async def save_presentation(output_path: Optional[str] = None) -> str:
         # Save As operation: use the provided output path
         target_path = Path(output_path)
         operation = "save_as"
-    
+
     # Validate the target path is within client roots
     is_valid, validation_error = validate_output_path(target_path)
     if not is_valid:
@@ -217,7 +218,7 @@ async def save_presentation(output_path: Optional[str] = None) -> str:
             "error": f"Security validation failed: {validation_error}",
             "execution_time": time.time() - start_time
         })
-    
+
     # Validate that the target directory exists (no automatic creation per specification)
     if not target_path.parent.exists():
         return json.dumps({
@@ -227,15 +228,15 @@ async def save_presentation(output_path: Optional[str] = None) -> str:
             "error": f"Parent directory does not exist: {target_path.parent}. Please ensure the directory exists before saving.",
             "execution_time": time.time() - start_time
         })
-    
+
     # Attempt to save the presentation
     try:
         session.loaded_presentation.save(str(target_path))
-        
+
         # Update session state if this was a Save As operation
         if operation == "save_as":
             session.loaded_presentation_path = target_path
-        
+
         return json.dumps({
             "success": True,
             "operation": operation,
@@ -243,7 +244,7 @@ async def save_presentation(output_path: Optional[str] = None) -> str:
             "error": None,
             "execution_time": time.time() - start_time
         })
-        
+
     except PermissionError:
         return json.dumps({
             "success": False,
@@ -252,7 +253,7 @@ async def save_presentation(output_path: Optional[str] = None) -> str:
             "error": "Permission denied: Cannot write to target file. Check file permissions and ensure the file is not open in another application.",
             "execution_time": time.time() - start_time
         })
-        
+
     except Exception as e:
         return json.dumps({
             "success": False,
@@ -267,17 +268,17 @@ async def get_presentation_tree() -> str:
     """Get the tree structure of the currently loaded PowerPoint presentation."""
     # Clean up expired sessions periodically
     cleanup_expired_sessions()
-    
+
     # Get the current session
     session = get_session()
-    
+
     if session.loaded_presentation is None or session.loaded_presentation_path is None:
         return json.dumps({
             "error": "No presentation loaded",
             "message": "Ensure a .pptx file is available in the client roots.",
             "session_id": session.session_id  # Include session ID for debugging
         }, indent=2)
-    
+
     # Return get_tree() output if available, otherwise return basic info
     try:
         if hasattr(session.loaded_presentation, 'get_tree'):
@@ -296,10 +297,38 @@ async def get_presentation_tree() -> str:
     except Exception as e:
         # If get_tree() fails, return error info
         error_info = {
-            "type": "presentation", 
+            "type": "presentation",
             "slide_count": len(session.loaded_presentation.slides),
             "file_path": str(session.loaded_presentation_path),
             "session_id": session.session_id,
             "error": f"Failed to get tree data: {str(e)}"
         }
         return json.dumps(error_info, indent=2)
+
+
+async def provide_feedback(feedback_text: str, is_success: bool, missing_capability: Optional[str] = None) -> str:
+    """
+    Provide structured feedback about the success or failure of tasks, helping improve the system over time.
+    
+    This tool enables the "Learn" phase of the agentic workflow. AI agents should use this tool to report
+    task outcomes, challenges encountered, and missing capabilities in python-pptx.
+    
+    Args:
+        feedback_text: Detailed description of what happened, what worked, or what failed
+        is_success: True if the task completed successfully, False if it failed or encountered issues
+        missing_capability: Optional description of any missing python-pptx functionality that would have helped
+        
+    Returns:
+        JSON string confirming feedback receipt
+    """
+    # Construct structured log message per MEP-006 specification
+    missing_str = missing_capability if missing_capability is not None else "None"
+    log_message = f"[AGENT_FEEDBACK] | SUCCESS: {is_success} | MISSING: {missing_str} | TEXT: \"{feedback_text}\""
+
+    # Log to stderr for developer review
+    print(log_message, file=sys.stderr, flush=True)
+
+    # Return confirmation message
+    return json.dumps({
+        "status": "Feedback received. Thank you."
+    })

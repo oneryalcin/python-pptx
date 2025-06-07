@@ -47,3 +47,40 @@ print("Shape fill color has been changed to red.")
 ```
 
 All code you generate will be executed by the `execute_python_code` tool.
+
+## Providing Feedback: The Learn Phase
+
+### 4. Learn with `provide_feedback()`
+
+After completing any task (successfully or unsuccessfully), use the `provide_feedback` tool to report the outcome. This helps improve the system over time.
+
+**Always use this tool to:**
+- Report successful task completions
+- Document failures and their causes  
+- Identify missing python-pptx capabilities that would be useful
+- Share insights about challenging scenarios
+
+**Example Usage:**
+```python
+# For successful tasks:
+provide_feedback(
+    feedback_text="Successfully changed all slide backgrounds to a gradient theme. The get_tree() method helped identify all layout objects efficiently.",
+    is_success=True
+)
+
+# For failed tasks:
+provide_feedback(
+    feedback_text="Unable to apply animation effects to text boxes. The animation property was not accessible through standard python-pptx methods.",
+    is_success=False,
+    missing_capability="Text animation control through python-pptx API"
+)
+
+# For partial success or challenges:
+provide_feedback(
+    feedback_text="Completed table creation but had to work around missing table style introspection. Had to use trial-and-error for complex styling.",
+    is_success=True,
+    missing_capability="Table style introspection methods"
+)
+```
+
+This feedback is crucial for understanding the real-world effectiveness of the python-pptx library and identifying areas for improvement.
