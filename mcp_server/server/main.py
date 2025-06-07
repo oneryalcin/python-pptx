@@ -2,12 +2,13 @@
 MCP server for python-pptx agentic toolkit.
 
 This server provides AI agents with access to python-pptx library capabilities
-through the Model Context Protocol (MCP). Implements MEP-003: Root and Resource Management.
+through the Model Context Protocol (MCP). Implements MEP-004: Unified Save and Save As Tool.
 
 Features:
 - Automatic presentation loading from client roots
 - Resource discovery and tree-based content reading
 - Simplified execute_python_code tool (no file_path required)
+- Unified save_presentation tool with security validation
 - Session-based state management for multi-client support
 """
 
@@ -143,7 +144,7 @@ def _set_client_roots(roots: List[types.Root]) -> None:
     for root in roots:
         try:
             # Parse the root URI to get the file path
-            parsed = urlparse(root.uri)
+            parsed = urlparse(str(root.uri))
             if parsed.scheme == 'file':
                 root_path = Path(parsed.path)
                 if root_path.exists():
@@ -167,6 +168,58 @@ def _load_presentation(file_path: Path) -> bool:
     """Load a presentation from the given file path for the current session."""
     session = _get_session()
     return session.load_presentation(file_path)
+
+
+def _validate_output_path(output_path: Path) -> tuple[bool, str]:
+    """
+    Validate that the output path is within one of the client-provided roots.
+    
+    Args:
+        output_path: The path to validate
+        
+    Returns:
+        tuple[bool, str]: (is_valid, error_message_if_invalid)
+    """
+    session = _get_session()
+    
+    if not session.client_roots:
+        return False, "No client roots configured. Cannot save files."
+    
+    # Resolve the output path to handle relative paths and symlinks
+    try:
+        resolved_output = output_path.resolve()
+    except (OSError, ValueError) as e:
+        return False, f"Invalid output path: {str(e)}"
+    
+    # Check if the output path is within any of the client roots
+    for root in session.client_roots:
+        try:
+            # Parse the root URI to get the file path
+            parsed = urlparse(str(root.uri))
+            if parsed.scheme == 'file':
+                root_path = Path(parsed.path).resolve()
+                
+                # Debug prints (will remove after testing)
+                # print(f"DEBUG: root.uri = {root.uri}")
+                # print(f"DEBUG: parsed.path = {parsed.path}")
+                # print(f"DEBUG: root_path = {root_path}")
+                # print(f"DEBUG: resolved_output = {resolved_output}")
+                
+                # Check if the resolved output path is within this root
+                try:
+                    relative_path = resolved_output.relative_to(root_path)
+                    # print(f"DEBUG: relative_path = {relative_path}")
+                    return True, ""  # Path is valid - within this root
+                except ValueError as e:
+                    # print(f"DEBUG: relative_to failed: {e}")
+                    # Path is not within this root, continue checking other roots
+                    continue
+        except Exception as e:
+            # print(f"DEBUG: Exception in root processing: {e}")
+            # Skip invalid roots
+            continue
+    
+    return False, f"Output path '{output_path}' is not within any configured client root directory."
 
 
 @mcp.tool()
@@ -289,6 +342,126 @@ async def execute_python_code(code: str) -> str:
             "stdout": stdout_capture.getvalue(),
             "stderr": stderr_capture.getvalue(),
             "error": f"Runtime error: {str(e)}",
+            "execution_time": time.time() - start_time
+        })
+
+
+@mcp.tool()
+async def save_presentation(output_path: Optional[str] = None) -> str:
+    """
+    Save the currently loaded PowerPoint presentation to disk. Supports both 'Save' and 'Save As' operations.
+    
+    If output_path is None, overwrites the original file (Save operation).
+    If output_path is provided, saves to the new location (Save As operation).
+    All output paths must be within the client-configured root directories for security.
+    
+    IMPORTANT: The parent directory of the output path must already exist. This tool will not create directories.
+    
+    Args:
+        output_path: Optional path where to save the presentation. If None, saves to original location.
+                    The parent directory must exist.
+        
+    Returns:
+        JSON string with save operation results including success status and file path
+    """
+    start_time = time.time()
+    
+    # Clean up expired sessions periodically
+    _cleanup_expired_sessions()
+    
+    # Get the current session
+    session = _get_session()
+    
+    # Validate python-pptx is available
+    if pptx is None:
+        return json.dumps({
+            "success": False,
+            "operation": "save",
+            "file_path": None,
+            "error": "python-pptx library is not available",
+            "execution_time": time.time() - start_time
+        })
+    
+    # Check if a presentation is loaded in this session
+    if session.loaded_presentation is None:
+        return json.dumps({
+            "success": False,
+            "operation": "save",
+            "file_path": None,
+            "error": "No PowerPoint presentation loaded. Ensure a .pptx file is available in the client roots.",
+            "execution_time": time.time() - start_time
+        })
+    
+    # Determine the target file path
+    if output_path is None:
+        # Save operation: use the original file path
+        if session.loaded_presentation_path is None:
+            return json.dumps({
+                "success": False,
+                "operation": "save",
+                "file_path": None,
+                "error": "Cannot determine original file path for save operation.",
+                "execution_time": time.time() - start_time
+            })
+        target_path = session.loaded_presentation_path
+        operation = "save"
+    else:
+        # Save As operation: use the provided output path
+        target_path = Path(output_path)
+        operation = "save_as"
+    
+    # Validate the target path is within client roots
+    is_valid, validation_error = _validate_output_path(target_path)
+    if not is_valid:
+        return json.dumps({
+            "success": False,
+            "operation": operation,
+            "file_path": str(target_path),
+            "error": f"Security validation failed: {validation_error}",
+            "execution_time": time.time() - start_time
+        })
+    
+    # Validate that the target directory exists (no automatic creation per specification)
+    if not target_path.parent.exists():
+        return json.dumps({
+            "success": False,
+            "operation": operation,
+            "file_path": str(target_path),
+            "error": f"Parent directory does not exist: {target_path.parent}. Please ensure the directory exists before saving.",
+            "execution_time": time.time() - start_time
+        })
+    
+    # Attempt to save the presentation
+    try:
+        session.loaded_presentation.save(str(target_path))
+        
+        # Update session state if this was a Save As operation
+        if operation == "save_as":
+            session.loaded_presentation_path = target_path
+        
+        return json.dumps({
+            "success": True,
+            "operation": operation,
+            "file_path": str(target_path),
+            "error": None,
+            "execution_time": time.time() - start_time
+        })
+        
+    except PermissionError:
+        return json.dumps({
+            "success": False,
+            "operation": operation,
+            "file_path": str(target_path),
+            "error": "Permission denied: Cannot write to target file. Check file permissions and ensure the file is not open in another application.",
+            "execution_time": time.time() - start_time
+        })
+        
+    except Exception as e:
+        return json.dumps({
+            "success": False,
+            "operation": operation,
+            "file_path": str(target_path),
+            "error": f"Failed to save presentation: {str(e)}",
             "execution_time": time.time() - start_time
         })
 
